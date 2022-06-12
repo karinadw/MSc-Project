@@ -28,15 +28,10 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     @Override
     public void init() {
 
-//        createLongAccumulator("workers in sector 1");
-//        createLongAccumulator("workers in sector 2");
-//        createLongAccumulator("workers in sector 3");
-//        createLongAccumulator("firms in sector 1");
-//        createLongAccumulator("firms in sector 2");
-//        createLongAccumulator("firms in sector 3");
+        createLongAccumulator("firm_vacancies");
 
-        registerAgentTypes(Firms.class, Workers.class);
-        registerLinkTypes(Links.FirmLink.class);
+        registerAgentTypes(Firms.class, Workers.class, LabourMarket.class);
+        registerLinkTypes(Links.WorkersLink.class, Links.FirmsLink.class);
     }
 
     @Override
@@ -44,9 +39,14 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         Group<Firms> simpleFirmGroup = generateGroup(Firms.class, getGlobals().nbFirms);
         Group<Workers> simpleWorkersGroup = generateGroup(Workers.class, getGlobals().nbWorkers);
+        Group<LabourMarket> labourMarketGroup =generateGroup(LabourMarket.class, 1);
 
-        simpleWorkersGroup.fullyConnected(simpleFirmGroup, Links.FirmLink.class);
-//        simpleFirmGroup.fullyConnected(simpleWorkersGroup, Links.FirmLink.class);
+        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkersLink.class);
+        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmsLink.class);
+
+        labourMarketGroup.fullyConnected(simpleFirmGroup, Links.FirmsLink.class);
+        labourMarketGroup.fullyConnected(simpleWorkersGroup, Links.WorkersLink.class);
+
 
         super.setup();
     }
@@ -55,21 +55,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void step() {
         super.step();
 
-//        run(
-//                Action.create(
-//                        Workers.class,
-//                        workers -> {
-//                            workers.applyForJob();
-//                        }),
-//                Action.create(
-//                        Firms.class,
-//                        firms -> {
-//                            firms.hire();
-////                            workers.employ();
-//                        }));
 
-        run(Workers.applyForJob(), Firms.hire());
-
+        run(Firms.initVariables(), Workers.applyForJob(), Firms.sendVacancies(), LabourMarket.getFirmVacancies(), LabourMarket.readApplications(), LabourMarket.FirmsHire(), Workers.updateAvailability(), Firms.updateVacancies());
+//        run(Firms.initVariables(), Firms.sendVacancies());
     }
 
 

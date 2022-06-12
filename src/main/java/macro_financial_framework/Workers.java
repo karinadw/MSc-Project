@@ -11,47 +11,35 @@ import java.util.Random;
 
 public class Workers extends Agent<MacroFinancialModel.Globals> {
 
-//    public static boolean isEmployed = false;  // everyone starts by being unemployed
+    public int sector_skills;
 
-//    public static int worker_sector;
-//    public static boolean isEmployed = false;
-//
-////    @Variable
-////    public int worker_sector_debug;
-//
-//
-//    void divide_into_sectors() {
-//        Random rand = new Random();
-//        Workers.worker_sector = rand.nextInt(4);
-////        worker_sector_debug = worker_sector;
-//    }
+    public enum Status{HIRED, UNEMPLOYED}
 
-
-    @Variable public int worker_sector;
+    public Status status = Status.UNEMPLOYED; //everyone starts by being unemployed
 
     @Override
     public void init() {
-        Random rand = new Random();
-        worker_sector = rand.nextInt(3);
+        sector_skills = getPrng().getNextInt(getGlobals().nbSectors);  // random sector skills applied to the workers
     }
 
-//    void applyForJob() {
-//        getLinks(Links.FirmLink.class).send(Messages.JobApplication.class, worker_sector);
-//    }
-
-    private static Action<Workers> action(SerializableConsumer<Workers> consumer) {
-        return Action.create(Workers.class, consumer);
-    }
 
     public static Action<Workers> applyForJob() {
-        return action(
+        return Action.create(Workers.class,
                 worker -> {
-                    worker.send_working_sector();
+                    if (worker.status == Status.UNEMPLOYED){
+                        worker. getLinks(Links.WorkersLink.class).send(Messages.JobApplication.class, worker.sector_skills);
+                    }
                 });
     }
 
-    private void send_working_sector(){
-        getLinks(Links.FirmLink.class).send(Messages.JobApplication.class, worker_sector);
+    public static Action<Workers> updateAvailability() {
+        return Action.create(Workers.class,
+                worker -> {
+                    if (worker.hasMessageOfType(Messages.WorkerHired.class)){
+                        worker.status = Status.HIRED;
+                    }
+
+                });
     }
 }
 
