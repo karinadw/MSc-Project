@@ -1,11 +1,12 @@
 package macro_financial_framework;
 
-import simudyne.core.abm.Action;
 import simudyne.core.abm.AgentBasedModel;
 import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
+import simudyne.core.abm.Split;
 import simudyne.core.annotations.Input;
-import simudyne.core.graph.LongAccumulator;
+
+import java.util.ArrayList;
 
 
 public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Globals> {
@@ -30,22 +31,28 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         createLongAccumulator("firm_vacancies");
 
-        registerAgentTypes(Firms.class, Workers.class, LabourMarket.class);
-        registerLinkTypes(Links.WorkersLink.class, Links.FirmsLink.class);
+        registerAgentTypes(Firm.class, Workers.class, Economy.class);
+        registerLinkTypes(Links.WorkerToLabourMarketLink.class, Links.FirmToLabourMarketLink.class, Links.FirmToWorkerLink.class, Links.WorkerToFirmLink.class);
     }
 
     @Override
     public void setup() {
 
-        Group<Firms> simpleFirmGroup = generateGroup(Firms.class, getGlobals().nbFirms);
-        Group<Workers> simpleWorkersGroup = generateGroup(Workers.class, getGlobals().nbWorkers);
-        Group<LabourMarket> labourMarketGroup =generateGroup(LabourMarket.class, 1);
+        Group<Firm> simpleFirmGroup = generateGroup(Firm.class, getGlobals().nbFirms, firm -> {
+            firm.vacancies = (int) firm.getPrng().uniform(2, 10).sample();
+            firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
+        });
+        Group<Workers> simpleWorkersGroup = generateGroup(Workers.class, getGlobals().nbWorkers, worker -> {
+            worker.sector_skills = worker.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
+        });
+        Group<Economy> labourMarketGroup =generateGroup(Economy.class, 1, market ->{
+            market.firmsHiring = new ArrayList<>();
+            market.availableWorkers = new ArrayList<>();
+        });
 
-        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkersLink.class);
-        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmsLink.class);
+        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkerToLabourMarketLink.class);
+        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmToLabourMarketLink.class);
 
-        labourMarketGroup.fullyConnected(simpleFirmGroup, Links.FirmsLink.class);
-        labourMarketGroup.fullyConnected(simpleWorkersGroup, Links.WorkersLink.class);
 
 
         super.setup();
@@ -55,8 +62,21 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void step() {
         super.step();
 
+//        firstStep(Firm.initVariables());
 
-        run(Firms.initVariables(), Workers.applyForJob(), Firms.sendVacancies(), LabourMarket.getFirmVacancies(), LabourMarket.readApplications(), LabourMarket.FirmsHire(), Workers.updateAvailability(), Firms.updateVacancies());
+        run(
+                Split.create(
+                        Workers.applyForJob(),
+                        Firm.sendVacancies()),
+                Economy.MatchFirmsAndWorkers(),
+                Split.create(
+                        Workers.updateAvailability(),
+                        Firm.updateVacancies()
+                ));
+
+        if (getContext().getTick() % 2 == 0) {
+
+        }
 //        run(Firms.initVariables(), Firms.sendVacancies());
     }
 
