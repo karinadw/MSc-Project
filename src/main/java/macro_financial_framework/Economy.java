@@ -22,8 +22,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
 
-    @Variable
-    public double wealth_economy = 0;
 
 
     public static Action<Economy> MatchFirmsAndWorkers() {
@@ -65,14 +63,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
             });
 
-        });
-    }
-
-    public static Action<Economy> receiveFirmWage() {
-        return Action.create(Economy.class, economy -> {
-            economy.getMessagesOfType(Messages.WorkerPayment.class).forEach(msg -> {
-                economy.wealth_economy += msg.wage;
-            });
         });
     }
 
