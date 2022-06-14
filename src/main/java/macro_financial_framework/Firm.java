@@ -28,7 +28,7 @@ public class Firm extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firm.class, firm -> {
             if (firm.hasMessageOfType(Messages.NewEmployee.class)) {
                 firm.getMessagesOfType(Messages.NewEmployee.class).forEach(msg -> {
-                    firm.addLink(msg.getSender(), Links.FirmToWorkerLink.class);
+                    firm.addLink(msg.workerID, Links.FirmToWorkerLink.class);
                     firm.vacancies--;
                 });
             }
@@ -42,18 +42,6 @@ public class Firm extends Agent<MacroFinancialModel.Globals> {
             });
         });
     }
-
-//    public static Action<Firm> FireWorkers(){
-//        return Action.create(Firm.class, firm -> {
-//            if (firm.hasMessageOfType(Messages.FiredWorker.class)) {
-//                firm.getMessagesOfType(Messages.FiredWorker.class).forEach(msg -> {
-//                    firm.removeLinksTo(msg.getSender(), Links.FirmToWorkerLink.class);
-//                    firm.vacancies++;
-//                });
-//            }
-//           });
-//    }
-
 
 }
 

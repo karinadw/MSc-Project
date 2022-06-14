@@ -45,7 +45,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         });
         Group<Workers> simpleWorkersGroup = generateGroup(Workers.class, getGlobals().nbWorkers, worker -> {
             worker.sector_skills = worker.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
-//            worker.wealth = 0;
+            worker.wealth = 0;
         });
         Group<Economy> labourMarketGroup = generateGroup(Economy.class, 1, market ->{
             market.firmsHiring = new ArrayList<>();
@@ -75,6 +75,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Workers.updateAvailability(),
                         Firm.updateVacancies()
                 ));
+
         run(Firm.payWorkers(), Workers.receiveSalary());
 
 //        if (getContext().getTick() % 2 == 0) {
