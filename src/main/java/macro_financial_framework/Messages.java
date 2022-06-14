@@ -21,7 +21,10 @@ public class Messages {
         public int vacancies;
     }
 
-    public static class FirmVacancies extends Message.Integer {}
+    public static class WorkerPayment extends Message {
+        public double wage;
+    }
+
 
 }
 

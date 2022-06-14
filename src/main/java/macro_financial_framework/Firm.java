@@ -11,14 +11,8 @@ public class Firm extends Agent<MacroFinancialModel.Globals> {
 
     public int sector;
 
-
-//    public static Action<Firm> initVariables() {
-//        return Action.create(Firm.class, firm -> {
-//            firm.sector = firm.getPrng().getNextInt(firm.getGlobals().nbSectors);
-////            firm.vacancies = firm.getPrng().getNextInt(10);
-//            firm.vacancies = 10;
-//        });
-//    }
+    @Variable
+    public double wage;
 
     public static Action<Firm> sendVacancies() {
         return Action.create(Firm.class, firms -> {
@@ -40,6 +34,25 @@ public class Firm extends Agent<MacroFinancialModel.Globals> {
             }
         });
     }
+
+    public static Action<Firm> payWorkers() {
+        return Action.create(Firm.class, firm -> {
+            firm.getLinks(Links.FirmToWorkerLink.class).send(Messages.WorkerPayment.class, (msg, link) -> {
+                msg.wage = firm.wage;
+            });
+        });
+    }
+
+//    public static Action<Firm> FireWorkers(){
+//        return Action.create(Firm.class, firm -> {
+//            if (firm.hasMessageOfType(Messages.FiredWorker.class)) {
+//                firm.getMessagesOfType(Messages.FiredWorker.class).forEach(msg -> {
+//                    firm.removeLinksTo(msg.getSender(), Links.FirmToWorkerLink.class);
+//                    firm.vacancies++;
+//                });
+//            }
+//           });
+//    }
 
 
 }

@@ -41,11 +41,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Group<Firm> simpleFirmGroup = generateGroup(Firm.class, getGlobals().nbFirms, firm -> {
             firm.vacancies = (int) firm.getPrng().uniform(2, 10).sample();
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
+            firm.wage = firm.getPrng().uniform(1000.00,3000.00).sample();
         });
         Group<Workers> simpleWorkersGroup = generateGroup(Workers.class, getGlobals().nbWorkers, worker -> {
             worker.sector_skills = worker.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
+//            worker.wealth = 0;
         });
-        Group<Economy> labourMarketGroup =generateGroup(Economy.class, 1, market ->{
+        Group<Economy> labourMarketGroup = generateGroup(Economy.class, 1, market ->{
             market.firmsHiring = new ArrayList<>();
             market.availableWorkers = new ArrayList<>();
         });
@@ -73,10 +75,14 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Workers.updateAvailability(),
                         Firm.updateVacancies()
                 ));
+        run(Firm.payWorkers(), Workers.receiveSalary());
 
-        if (getContext().getTick() % 2 == 0) {
-
-        }
+//        if (getContext().getTick() % 2 == 0) {
+//            run(Economy.FireWorkers());
+//            run(Workers.SendFiredInfoToFirm());
+//            run(Firm.FireWorkers());
+//
+//        }
 //        run(Firms.initVariables(), Firms.sendVacancies());
     }
 

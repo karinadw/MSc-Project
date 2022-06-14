@@ -6,6 +6,7 @@ public class FirmID {
     public int sector;
     public int vacancies;
 
+
     public FirmID(long ID, int sector, int vacancies) {
         this.ID = ID;
         this.sector = sector;

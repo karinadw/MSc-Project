@@ -1,7 +1,9 @@
 package macro_financial_framework;
 
+//import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
+import simudyne.core.annotations.Variable;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +22,9 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
 
+    @Variable
+    public double wealth_economy = 0;
+
 
     public static Action<Economy> MatchFirmsAndWorkers() {
         return Action.create(Economy.class, market -> {
@@ -33,19 +38,19 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             market.firmsHiring.forEach(firm -> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
-                for (int x = 0; x < vacancies; x++){
+                for (int x = 0; x < vacancies; x++) {
                     Optional<WorkerID> potentialWorker = market.availableWorkers.stream().filter(w -> w.sector == sector).findAny();
-                    if (potentialWorker.isPresent()){
+                    if (potentialWorker.isPresent()) {
 
                         // sends message to the workers
                         WorkerID worker = potentialWorker.get();
                         market.send(Messages.Hired.class, m -> {
-                           m.firmID = firm.ID;
+                            m.firmID = firm.ID;
                         }).to(worker.ID);
 
                         // sends employee's info to firm
                         market.send(Messages.NewEmployee.class, e -> {
-                           e.workerID = worker.ID;
+                            e.workerID = worker.ID;
                         }).to(firm.ID);
 
                         market.availableWorkers.remove(worker);
@@ -63,34 +68,15 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-//    public static Action<LabourMarket> FirmsHire() {
-//        return Action.create(LabourMarket.class, market -> {
-//            market.FirmVacancies.keySet().forEach(firmID -> {
-//
-//                // check if firm has vacancies
-//                if (market.FirmVacancies.get(firmID) > 0) {
-//
-//                    // if it does, get the sector in which it works
-//                    int sector = market.FirmSectors.get(firmID);
-//
-//                    // iterate over all the workers until a match between firm sector and worker sector is found
-//                    AtomicInteger firmVacancies = new AtomicInteger(market.FirmVacancies.get(firmID));
-//                    AtomicInteger hired = new AtomicInteger(0);
-//
-//                    market.applicants.keySet().forEach(workerID -> {
-//                        int sector_worker = market.applicants.get(workerID);
-//                        if (sector_worker == sector && hired.get() <= firmVacancies.get()) {
-//                            market.getLinksTo(firmID, Links.WorkerToLabourMarketLink.class).send(Messages.WorkerHired.class);
-//                            market.getLinksTo(firmID, Links.FirmToLabourMarketLink.class).send(Messages.FirmHiredWorker.class);
-//                            firmVacancies.addAndGet(-1);
-//                            hired.addAndGet(+1);
-//                        }
-//                    });
-//                }
-//            });
-//        });
-//    }
-
+    public static Action<Economy> receiveFirmWage() {
+        return Action.create(Economy.class, economy -> {
+            economy.getMessagesOfType(Messages.WorkerPayment.class).forEach(msg -> {
+                economy.wealth_economy += msg.wage;
+            });
+        });
+    }
 
 }
+
+
 
