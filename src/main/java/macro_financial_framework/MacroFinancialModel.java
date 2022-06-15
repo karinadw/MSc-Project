@@ -5,7 +5,6 @@ import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Split;
 import simudyne.core.annotations.Input;
-import simudyne.core.graph.Link;
 
 import java.util.ArrayList;
 
@@ -44,23 +43,24 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     @Override
     public void setup() {
 
-        Group<Firms> simpleFirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
+        Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.vacancies = (int) firm.getPrng().uniform(2, 10).sample();
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
             firm.firingRate = 0.05;
         });
-        Group<Households> simpleWorkersGroup = generateGroup(Households.class, getGlobals().nbWorkers, worker -> {
-            worker.sector_skills = worker.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
-            worker.wealth = 0;
-            worker.productivity = worker.getPrng().getNextInt(10);
+        Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
+            household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
+            household.wealth = 0;
+            household.productivity = household.getPrng().getNextInt(10);
+            household.unemploymentBenefits = (61.05 + 77.00) / 2; // average of above and below 24 years
         });
-        Group<Economy> labourMarketGroup = generateGroup(Economy.class, 1, market ->{
+        Group<Economy> Economy = generateGroup(Economy.class, 1, market ->{
             market.firmsHiring = new ArrayList<>();
             market.availableWorkers = new ArrayList<>();
         });
 
-        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkerToEconomyLink.class);
-        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmToEconomyLink.class);
+        HouseholdGroup.fullyConnected(Economy, Links.WorkerToEconomyLink.class);
+        FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
 
 
 
@@ -98,7 +98,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 ));
 
         // workers get paid the wage offered by their firm and investors get paid dividends
-        run(Firms.payWorkers(), Households.receiveSalary());
+        run(Firms.payWorkers(), Households.receiveIncome());
 
         // assuming 12 ticks represent a year
         // annually firms fire workers and workers update their availabilities

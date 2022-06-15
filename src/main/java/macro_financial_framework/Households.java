@@ -10,6 +10,8 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double wealth;
 
+    public double unemploymentBenefits;
+
     public int productivity;
     public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
 
@@ -53,10 +55,12 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                 });
     }
 
-    public static Action<Households> receiveSalary() {
+    public static Action<Households> receiveIncome() {
         return Action.create(Households.class, worker -> {
-            if (worker.hasMessageOfType(Messages.WorkerPayment.class)){
+            if (worker.status == Status.WORKER_EMPLOYED && worker.hasMessageOfType(Messages.WorkerPayment.class)){
                 worker.wealth += worker.getMessageOfType(Messages.WorkerPayment.class).wage;
+            } else if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
+                worker.wealth += worker.unemploymentBenefits;
             }
         });
     }
