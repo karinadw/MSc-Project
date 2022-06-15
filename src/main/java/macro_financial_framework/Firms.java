@@ -41,7 +41,13 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firms.class, firm -> {
             if (firm.hasMessageOfType(Messages.FirmWage.class)){
                 firm.getMessagesOfType(Messages.FirmWage.class).forEach(msg -> {
-                    firm.wage = msg.wage + firm.getPrng().uniform(-200.00, 200.00).sample(); // all the firms have +- 200.00 the wage for that sector
+                    if (firm.sizeOfCompany == 0) {
+                        firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average
+                    } else if (firm.sizeOfCompany == 1){
+                        firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium sized companies pay a wage that can be slightly lower or higher than average
+                    } else {
+                        firm.wage = msg.wage + firm.getPrng().uniform(100.00, 200.00).sample(); // big companies pay a wage that is higher than the average for the sector
+                    }
                 });
             }
         });
