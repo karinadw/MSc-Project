@@ -14,6 +14,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public int vacancies;
 
+    public int sizeOfCompany;
+
     public int sector;
 
     @Variable
@@ -24,6 +26,17 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public HashMap<Integer, Double> sectorWages;
 
+    public static Action<Firms> SetVacancies(){
+        return Action.create(Firms.class, firm -> {
+           if (firm.sizeOfCompany == 0){
+               firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
+           } else if (firm.sizeOfCompany == 1){
+               firm.vacancies = (int) firm.getPrng().uniform(10, 100).sample();
+           } else {
+               firm.vacancies = (int) firm.getPrng().uniform(100, 1000).sample();
+           }
+        });
+    }
     public static Action<Firms> SetSectorSpecificWages(){
         return Action.create(Firms.class, firm -> {
             if (firm.hasMessageOfType(Messages.FirmWage.class)){

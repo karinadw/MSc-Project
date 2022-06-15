@@ -44,9 +44,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void setup() {
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
-            firm.vacancies = (int) firm.getPrng().uniform(2, 10).sample();
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
             firm.firingRate = 0.05;
+            firm.sizeOfCompany = firm.getPrng().getNextInt(2); //start-up: 0, medium-sized: 1, large company: 2
         });
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
@@ -70,6 +70,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     @Override
     public void step() {
         super.step();
+
+        // firms set their vacancies according to their size
+        run(Firms.SetVacancies());
 
         // dividing households into investors and workers
         run(
