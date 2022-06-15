@@ -6,6 +6,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +23,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 //    }
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
+
 
 
     public static Action<Economy> AssignInvestorToFirm(){
@@ -49,6 +51,27 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 }).to(investorID);
 
             }
+        });
+    }
+
+    public static Action<Economy> SetFirmWages(){
+        return Action.create(Economy.class, market -> {
+            // creating a hashmap tp store all the sectors and their corresponding wage
+            HashMap<Integer, Double> sectorWages = new HashMap<Integer, Double>();
+            int numberOfSectors = market.getGlobals().nbSectors; // not adding -1 and instead keeping i<numberOfSector instead of <=
+            for(int i = 0; i < numberOfSectors; i++){
+                int sector = i;
+                double wage = market.getPrng().uniform(1000.00,3000.00).sample();
+                sectorWages.put(sector, wage);
+            }
+
+            market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
+                int firmSector = m.sector;
+                double firmWage = sectorWages.get(firmSector);
+                market.send(Messages.FirmWage.class, msg -> {
+                    msg.wage = firmWage;
+                }).to(m.getSender());
+            });
         });
     }
 

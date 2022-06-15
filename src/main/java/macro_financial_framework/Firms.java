@@ -6,6 +6,7 @@ import simudyne.core.annotations.Input;
 import simudyne.core.annotations.Variable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class Firms extends Agent<MacroFinancialModel.Globals> {
@@ -21,22 +22,27 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Input
     public double firingRate;
 
+    public HashMap<Integer, Double> sectorWages;
+
+    public static Action<Firms> SetSectorSpecificWages(){
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.FirmWage.class)){
+                firm.getMessagesOfType(Messages.FirmWage.class).forEach(msg -> {
+                    firm.wage = msg.wage + firm.getPrng().uniform(-200.00, 200.00).sample(); // all the firms have +- 200.00 the wage for that sector
+                });
+            }
+        });
+    }
+
     public static Action<Firms> FindInvestors() {
+        // send info to the economy agent to find an investor
         return Action.create(Firms.class, firm -> {
            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FindInvestor.class);
         });
     }
 
-//    public static AssignFirmInvestor(){
-//        return Action.create(Firms.class, firm -> {
-//           if (firm.hasMessageOfType(Messages.InvestorOfFirm.class)){
-//               long investorId = firm.getMessageOfType(Messages.InvestorOfFirm.class).investorID;
-//               firm.addLink(investorId, Links.FirmToInvestorLink.class)
-//           }
-//        });
-//    }
-
     public static Action<Firms> AssignFirmInvestor() {
+        // each firm is assigned one investor
         return Action.create(Firms.class, firm -> {
             if (firm.hasMessageOfType(Messages.InvestorOfFirm.class)) {
                 firm.getMessagesOfType(Messages.InvestorOfFirm.class).forEach(msg -> {
@@ -47,6 +53,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Firms> sendVacancies() {
+        // send vacancies of the firm
         return Action.create(Firms.class, firms -> {
             firms.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmInformation.class, (msg, link) -> {
                 msg.vacancies = firms.vacancies;
@@ -56,6 +63,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Firms> updateVacancies() {
+        // hires workers and adjusts vacancies
         return Action.create(Firms.class, firm -> {
             if (firm.hasMessageOfType(Messages.NewEmployee.class)) {
                 firm.getMessagesOfType(Messages.NewEmployee.class).forEach(msg -> {
@@ -67,6 +75,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Firms> payWorkers() {
+        // pays the workers
         return Action.create(Firms.class, firm -> {
             firm.getLinks(Links.FirmToWorkerLink.class).send(Messages.WorkerPayment.class, (msg, link) -> {
                 msg.wage = firm.wage;

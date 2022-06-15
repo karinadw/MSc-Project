@@ -33,7 +33,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         createLongAccumulator("firm_vacancies");
 
         registerAgentTypes(Firms.class, Households.class, Economy.class);
-        registerLinkTypes(Links.WorkerToEconomyLink.class, Links.FirmToEconomyLink.class, Links.FirmToWorkerLink.class, Links.WorkerToFirmLink.class, Links.FirmToInvestorLink.class, Links.InvestorToFirmLink.class);
+        registerLinkTypes(Links.WorkerToEconomyLink.class,
+                Links.FirmToEconomyLink.class,
+                Links.FirmToWorkerLink.class,
+                Links.WorkerToFirmLink.class,
+                Links.FirmToInvestorLink.class,
+                Links.InvestorToFirmLink.class);
     }
 
     @Override
@@ -42,7 +47,6 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Group<Firms> simpleFirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.vacancies = (int) firm.getPrng().uniform(2, 10).sample();
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
-            firm.wage = firm.getPrng().uniform(1000.00,3000.00).sample();
             firm.firingRate = 0.05;
         });
         Group<Households> simpleWorkersGroup = generateGroup(Households.class, getGlobals().nbWorkers, worker -> {
@@ -77,16 +81,22 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Firms.AssignFirmInvestor()
                 )
         );
+
         // workers apply for jobs and firms that have vacancies hire
+        // firms set their wage according to the sector they're in
         run(
                 Split.create(
                         Households.applyForJob(),
                         Firms.sendVacancies()),
-                Economy.MatchFirmsAndWorkers(),
                 Split.create(
+                        Economy.SetFirmWages(),
+                        Economy.MatchFirmsAndWorkers()),
+                Split.create(
+                        Firms.SetSectorSpecificWages(),
                         Households.updateAvailability(),
                         Firms.updateVacancies()
                 ));
+
         // workers get paid the wage offered by their firm and investors get paid dividends
         run(Firms.payWorkers(), Households.receiveSalary());
 

@@ -11,6 +11,10 @@ public class Messages {
         public long investorID;
     }
 
+    public static class FirmWage extends Message {
+        public double wage;
+    }
+
     public static class FirmAssignedToInvestor extends Message {
         public long firmID;
     }
