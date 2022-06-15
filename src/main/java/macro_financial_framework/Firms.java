@@ -21,9 +21,34 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Input
     public double firingRate;
 
+    public static Action<Firms> FindInvestors() {
+        return Action.create(Firms.class, firm -> {
+           firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FindInvestor.class);
+        });
+    }
+
+//    public static AssignFirmInvestor(){
+//        return Action.create(Firms.class, firm -> {
+//           if (firm.hasMessageOfType(Messages.InvestorOfFirm.class)){
+//               long investorId = firm.getMessageOfType(Messages.InvestorOfFirm.class).investorID;
+//               firm.addLink(investorId, Links.FirmToInvestorLink.class)
+//           }
+//        });
+//    }
+
+    public static Action<Firms> AssignFirmInvestor() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.InvestorOfFirm.class)) {
+                firm.getMessagesOfType(Messages.InvestorOfFirm.class).forEach(msg -> {
+                    firm.addLink(msg.investorID, Links.FirmToInvestorLink.class);
+                });
+            }
+        });
+    }
+
     public static Action<Firms> sendVacancies() {
         return Action.create(Firms.class, firms -> {
-            firms.getLinks(Links.FirmToLabourMarketLink.class).send(Messages.FirmInformation.class, (msg, link) -> {
+            firms.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmInformation.class, (msg, link) -> {
                 msg.vacancies = firms.vacancies;
                 msg.sector = firms.sector;
             });

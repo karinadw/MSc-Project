@@ -5,6 +5,7 @@ import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Split;
 import simudyne.core.annotations.Input;
+import simudyne.core.graph.Link;
 
 import java.util.ArrayList;
 
@@ -32,7 +33,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         createLongAccumulator("firm_vacancies");
 
         registerAgentTypes(Firms.class, Households.class, Economy.class);
-        registerLinkTypes(Links.WorkerToLabourMarketLink.class, Links.FirmToLabourMarketLink.class, Links.FirmToWorkerLink.class, Links.WorkerToFirmLink.class);
+        registerLinkTypes(Links.WorkerToEconomyLink.class, Links.FirmToEconomyLink.class, Links.FirmToWorkerLink.class, Links.WorkerToFirmLink.class, Links.FirmToInvestorLink.class, Links.InvestorToFirmLink.class);
     }
 
     @Override
@@ -54,8 +55,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             market.availableWorkers = new ArrayList<>();
         });
 
-        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkerToLabourMarketLink.class);
-        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmToLabourMarketLink.class);
+        simpleWorkersGroup.fullyConnected(labourMarketGroup, Links.WorkerToEconomyLink.class);
+        simpleFirmGroup.fullyConnected(labourMarketGroup, Links.FirmToEconomyLink.class);
 
 
 
@@ -66,8 +67,17 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void step() {
         super.step();
 
-//        firstStep(Firm.initVariables());
-
+        // dividing households into investors and workers
+        run(
+                Split.create(Households.ApplyForInvestor(),
+                            Firms.FindInvestors()),
+                Economy.AssignInvestorToFirm(),
+                Split.create(
+                        Households.DetermineStatus(),
+                        Firms.AssignFirmInvestor()
+                )
+        );
+        // workers apply for jobs and firms that have vacancies hire
         run(
                 Split.create(
                         Households.applyForJob(),
@@ -77,9 +87,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Households.updateAvailability(),
                         Firms.updateVacancies()
                 ));
-
+        // workers get paid the wage offered by their firm and investors get paid dividends
         run(Firms.payWorkers(), Households.receiveSalary());
 
+        // assuming 12 ticks represent a year
+        // annually firms fire workers and workers update their availabilities
         if (getContext().getTick() % 12 == 0) {
             run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
         }

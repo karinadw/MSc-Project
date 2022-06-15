@@ -4,6 +4,16 @@ import simudyne.core.graph.Message;
 
 public class Messages {
 
+    public static class ApplyForInvestor extends Message {}
+    public static class FindInvestor extends Message {}
+
+    public static class InvestorOfFirm extends Message {
+        public long investorID;
+    }
+
+    public static class FirmAssignedToInvestor extends Message {
+        public long firmID;
+    }
     public static class Hired extends Message {
         public long firmID;
     }

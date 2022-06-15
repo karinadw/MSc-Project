@@ -11,18 +11,32 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public double wealth;
 
     public int productivity;
+    public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
 
-    public enum Status {EMPLOYED, UNEMPLOYED, UNEMPLOYED_APPLIED}
+    public Status status = Status.WORKER_UNEMPLOYED; //everyone starts by being unemployed
 
-    public Status status = Status.UNEMPLOYED; //everyone starts by being unemployed
+    public static Action<Households> ApplyForInvestor() {
+        return Action.create(Households.class, investor -> {
+            // determine who is an investor and not and connect the investors to firms
+            investor.getLinks(Links.WorkerToEconomyLink.class).send(Messages.ApplyForInvestor.class);
+        });
+    }
 
-
+    public static Action<Households> DetermineStatus() {
+        return Action.create(Households.class, household -> {
+            // check if household has been assigned a firm and therefore status of investor
+           if (household.hasMessageOfType(Messages.FirmAssignedToInvestor.class)){
+               household.status = Status.INVESTOR;
+               household.addLink(household.getMessageOfType(Messages.FirmAssignedToInvestor.class).firmID, Links.InvestorToFirmLink.class);
+            }
+        });
+    }
     public static Action<Households> applyForJob() {
         return Action.create(Households.class,
                 worker -> {
-                    if (worker.status == Status.UNEMPLOYED) {
-                        worker.getLinks(Links.WorkerToLabourMarketLink.class).send(Messages.JobApplication.class, worker.sector_skills);
-                        worker.status = Status.UNEMPLOYED_APPLIED;
+                    if (worker.status == Status.WORKER_UNEMPLOYED) {
+                        worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.JobApplication.class, worker.sector_skills);
+                        worker.status = Status.WORKER_UNEMPLOYED_APPLIED;
                     }
                 });
     }
@@ -33,7 +47,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                     if (worker.hasMessageOfType(Messages.Hired.class)) {
                         long firmID = worker.getMessageOfType(Messages.Hired.class).firmID;
                         worker.addLink(firmID, Links.WorkerToFirmLink.class);
-                        worker.status = Status.EMPLOYED;
+                        worker.status = Status.WORKER_EMPLOYED;
                     }
 
                 });
@@ -57,7 +71,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Households.class, worker -> {
            if (worker.hasMessageOfType(Messages.Fired.class)){
                worker.removeLinksTo(worker.getMessageOfType(Messages.Fired.class).getSender());
-               worker.status = Status.UNEMPLOYED;
+               worker.status = Status.WORKER_UNEMPLOYED;
            }
         });
     }

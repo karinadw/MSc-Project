@@ -5,6 +5,7 @@ import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,35 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 //    }
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
+
+
+    public static Action<Economy> AssignInvestorToFirm(){
+        return Action.create(Economy.class, market -> {
+            List<Long> allHouseholds = new ArrayList<Long>();
+            market.getMessagesOfType(Messages.ApplyForInvestor.class).forEach(msg -> {
+                allHouseholds.add(msg.getSender());
+            });
+
+            List<Long> allFirms = new ArrayList<Long>();
+            market.getMessagesOfType(Messages.FindInvestor.class).forEach(msg -> {
+                allFirms.add(msg.getSender());
+            });
+
+            for(int i = 0; i < allFirms.size(); i++){
+                long investorID = allHouseholds.get(i);
+                long firmID = allFirms.get(i);
+
+                market.send(Messages.InvestorOfFirm.class, m -> {
+                    m.investorID = investorID;
+                }).to(firmID);
+
+                market.send(Messages.FirmAssignedToInvestor.class, firm -> {
+                    firm.firmID = firmID;
+                }).to(investorID);
+
+            }
+        });
+    }
 
 
 
