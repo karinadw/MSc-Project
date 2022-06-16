@@ -5,10 +5,7 @@ import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class Economy extends Agent<MacroFinancialModel.Globals> {
 
@@ -93,7 +90,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     public static Action<Economy> MatchFirmsAndWorkers() {
         return Action.create(Economy.class, market -> {
             market.getMessagesOfType(Messages.JobApplication.class).forEach(msg -> {
-                market.availableWorkers.add(new WorkerID(msg.getSender(), msg.getBody()));
+                market.availableWorkers.add(new WorkerID(msg.getSender(), msg.sector, msg.productivity));
             });
             market.firmsHiring.clear();  // to account for new vacancies in case of firing
             market.getMessagesOfType(Messages.FirmInformation.class).forEach(mes -> {
@@ -103,11 +100,12 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
                 for (int x = 0; x < vacancies; x++) {
-                    Optional<WorkerID> potentialWorker = market.availableWorkers.stream().filter(w -> w.sector == sector).findAny();
-                    if (potentialWorker.isPresent()) {
+                    //TODO: choose worker with preferences of higher productivity
+                    Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findAny();
+                    if (potentialWorkerGoodCandidate.isPresent()) {
 
                         // sends message to the workers
-                        WorkerID worker = potentialWorker.get();
+                        WorkerID worker = potentialWorkerGoodCandidate.get();
                         market.send(Messages.Hired.class, m -> {
                             m.firmID = firm.ID;
                         }).to(worker.ID);

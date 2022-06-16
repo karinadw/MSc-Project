@@ -53,6 +53,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             household.wealth = 0;
             household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00) / 2; // average of above and below 24 years
+            household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
         Group<Economy> Economy = generateGroup(Economy.class, 1, market ->{
             market.firmsHiring = new ArrayList<>();
@@ -76,6 +77,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
             // firms set their vacancies according to their size
             run(Firms.SetVacancies());
+
+            //the firm sets the prices of the goods it produces and the economy stores the firm ID and price of good produced
+            run(Firms.SetPriceOfGoods(), Economy.setFirmPriceOfGoods());
 
             // dividing households into investors and workers
             run(

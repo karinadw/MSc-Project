@@ -30,7 +30,10 @@ public class Messages {
         public long workerID;
     }
 
-    public static class JobApplication extends Message.Integer {}
+    public static class JobApplication extends Message {
+        public int sector;
+        public double productivity;
+    }
 
     public static class FirmInformation extends Message {
         public int sector;
@@ -41,7 +44,9 @@ public class Messages {
         public double wage;
     }
 
-    public static class AnnualCheck extends Message{}
+    public static class AnnualCheck extends Message{
+        public double productivity;
+    }
 
     public static class Fired extends Message{}
 

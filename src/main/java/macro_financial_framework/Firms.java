@@ -15,7 +15,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public int vacancies;
 
     public int sizeOfCompany;
-
+    @Variable
     public int sector;
 
     @Variable
@@ -25,6 +25,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double firingRate;
 
     public double priceOfGoods;
+
+    public double productivity;
 
 
     public static Action<Firms> SetVacancies(){
@@ -118,20 +120,29 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firms.class, firm -> {
             // empty list to store the IDs of the workers of the firm
             List<Long> workersID = new ArrayList<Long>();
+            List<Double> workersProductivity = new ArrayList<Double>();
+
             // storing all the IDs
             firm.getMessagesOfType(Messages.AnnualCheck.class).forEach(msg -> {
                 workersID.add(msg.getSender());
             });
 
+            // storing all the productivities
+            firm.getMessagesOfType(Messages.AnnualCheck.class).forEach(msg -> {
+                workersProductivity.add(msg.productivity);
+            });
+
             // number of workers to be fired
             int numberOfWorkersToFire = (int) Math.ceil(workersID.size() * firm.firingRate);
-            System.out.println(numberOfWorkersToFire);
             int i = 0;
             while(i < numberOfWorkersToFire){
-                firm.send(Messages.Fired.class).to(workersID.get(i));
-                firm.removeLinksTo(workersID.get(i));
-                firm.vacancies ++;
-                i++;
+                double workerProductivity = workersProductivity.get(i); // if workers have a productivity above 0.9 they won't get fired
+                if (workerProductivity< 0.9) {
+                    firm.send(Messages.Fired.class).to(workersID.get(i));
+                    firm.removeLinksTo(workersID.get(i));
+                    firm.vacancies++;
+                    i++;
+                }
             }
 
         });

@@ -5,14 +5,14 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 public class Households extends Agent<MacroFinancialModel.Globals> {
-
+    @Variable
     public int sector_skills;
     @Variable
     public double wealth;
 
     public double unemploymentBenefits;
-
-    public int productivity;
+    @Variable
+    public double productivity;
     public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
 
     public Status status = Status.WORKER_UNEMPLOYED; //everyone starts by being unemployed
@@ -37,7 +37,10 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Households.class,
                 worker -> {
                     if (worker.status == Status.WORKER_UNEMPLOYED) {
-                        worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.JobApplication.class, worker.sector_skills);
+                        worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.JobApplication.class, (msg, link) -> {
+                            msg.productivity = worker.productivity;
+                            msg.sector = worker.sector_skills;
+                        });
                         worker.status = Status.WORKER_UNEMPLOYED_APPLIED;
                     }
                 });
@@ -67,7 +70,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Households> AnnualCheck() {
         return Action.create(Households.class, worker -> {
-            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.AnnualCheck.class);
+            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.AnnualCheck.class, (m, l) -> {
+                m.productivity = worker.productivity;
+            });
         });
     }
 
