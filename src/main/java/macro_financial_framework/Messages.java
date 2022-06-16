@@ -15,6 +15,10 @@ public class Messages {
         public double wage;
     }
 
+    public static class priceOfGoods extends Message {
+        public double price;
+    }
+
     public static class FirmAssignedToInvestor extends Message {
         public long firmID;
     }

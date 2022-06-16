@@ -24,6 +24,11 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
 
+    public HashMap<Long, Double> priceOfGoods;
+
+    public Economy(){
+        priceOfGoods = new HashMap<Long, Double>();
+    }
 
 
     public static Action<Economy> AssignInvestorToFirm(){
@@ -72,6 +77,14 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                     msg.wage = firmWage;
                 }).to(m.getSender());
             });
+        });
+    }
+
+    public static Action<Economy> setFirmPriceOfGoods(){
+        return Action.create(Economy.class, market -> {
+           market.getMessagesOfType(Messages.priceOfGoods.class).forEach(msg -> {
+               market.priceOfGoods.put(msg.getSender(), msg.price);
+           });
         });
     }
 

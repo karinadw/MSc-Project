@@ -24,10 +24,12 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Input
     public double firingRate;
 
-    public HashMap<Integer, Double> sectorWages;
+    public double priceOfGoods;
+
 
     public static Action<Firms> SetVacancies(){
         return Action.create(Firms.class, firm -> {
+            // set vacancies according to firm size
            if (firm.sizeOfCompany == 0){
                firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
            } else if (firm.sizeOfCompany == 1){
@@ -50,6 +52,16 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     }
                 });
             }
+        });
+    }
+
+    public static Action<Firms> SetPriceOfGoods(){
+        return Action.create(Firms.class, firm -> {
+            double price = firm.getPrng().getNextDouble(1000.00);
+            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.priceOfGoods.class, (priceOfGoods, firmToEconomyLink) -> {
+                priceOfGoods.price = price;
+            });
+            firm.priceOfGoods = price;
         });
     }
 

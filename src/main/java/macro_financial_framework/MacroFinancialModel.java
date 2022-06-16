@@ -16,13 +16,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public static class Globals extends GlobalState {
 
         @Input
-        public long nbFirms = 15;
+        public long nbFirms = 50;
 
         @Input
-        public long nbWorkers  = 50;
+        public long nbWorkers  = 100;
 
         @Input
-        public int nbSectors = 3;
+        public int nbSectors = 10;
 
     }
 
@@ -71,45 +71,51 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void step() {
         super.step();
 
-        // firms set their vacancies according to their size
-        run(Firms.SetVacancies());
+        // set everything up in the first tick
+        if (getContext().getTick() == 0){
 
-        // dividing households into investors and workers
-        run(
-                Split.create(Households.ApplyForInvestor(),
+            // firms set their vacancies according to their size
+            run(Firms.SetVacancies());
+
+            // dividing households into investors and workers
+            run(
+                    Split.create(Households.ApplyForInvestor(),
                             Firms.FindInvestors()),
-                Economy.AssignInvestorToFirm(),
-                Split.create(
-                        Households.DetermineStatus(),
-                        Firms.AssignFirmInvestor()
-                )
-        );
+                    Economy.AssignInvestorToFirm(),
+                    Split.create(
+                            Households.DetermineStatus(),
+                            Firms.AssignFirmInvestor()
+                    )
+            );
 
-        // workers apply for jobs and firms that have vacancies hire
-        // firms set their wage according to the sector they're in
-        run(
-                Split.create(
-                        Households.applyForJob(),
-                        Firms.sendVacancies()),
-                Split.create(
-                        Economy.SetFirmWages(),
-                        Economy.MatchFirmsAndWorkers()),
-                Split.create(
-                        Firms.SetSectorSpecificWages(),
-                        Households.updateAvailability(),
-                        Firms.updateVacancies()
-                ));
+        }
 
-        // workers get paid the wage offered by their firm and investors get paid dividends
-        run(Firms.payWorkers(), Households.receiveIncome());
+        if(getContext().getTick() > 0){
+            // workers apply for jobs and firms that have vacancies hire
+            // firms set their wage according to the sector they're in
+            run(
+                    Split.create(
+                            Households.applyForJob(),
+                            Firms.sendVacancies()),
+                    Split.create(
+                            Economy.SetFirmWages(),
+                            Economy.MatchFirmsAndWorkers()),
+                    Split.create(
+                            Firms.SetSectorSpecificWages(),
+                            Households.updateAvailability(),
+                            Firms.updateVacancies()
+                    ));
 
-        // assuming 12 ticks represent a year
-        // annually firms fire workers and workers update their availabilities
-        if (getContext().getTick() % 12 == 0) {
-            run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
+            // workers get paid the wage offered by their firm and investors get paid dividends
+            run(Firms.payWorkers(), Households.receiveIncome());
+
+            // assuming 12 ticks represent a year
+            // annually firms fire workers and workers update their availabilities
+            if (getContext().getTick() % 12 == 0) {
+                run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
+            }
         }
     }
-
 
 }
 
