@@ -41,7 +41,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 Links.FirmToWorkerLink.class,
                 Links.WorkerToFirmLink.class,
                 Links.FirmToInvestorLink.class,
-                Links.InvestorToFirmLink.class);
+                Links.InvestorToFirmLink.class,
+                Links.FirmToBuyerLink.class);
     }
 
     @Override
@@ -54,7 +55,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         });
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
-            household.savings = 0;
+            household.wealth = 0;
             household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00) / 2; // average of above and below 24 years
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
@@ -128,7 +129,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                             Households.sendDemand(),
                             Firms.sendSupply()),
                     Economy.sendDemandToFirm(),
-                    Firms.receiveDemand()
+                    Firms.receiveDemandAndSell(),
+                    Households.buyGoods()
             );
 
             // assuming 12 ticks represent a year

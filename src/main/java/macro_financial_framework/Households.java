@@ -8,11 +8,14 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public int sector_skills;
     @Variable
-    public double savings;
+    public double wealth;
+
+    public double savings = 0.0d;
     public double wage;
     public double unemploymentBenefits;
     @Variable
     public double productivity;
+    public double consumptionBudget;
     public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
 
     public Status status = Status.WORKER_UNEMPLOYED; //everyone starts by being unemployed
@@ -70,10 +73,10 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> receiveIncome() {
         return Action.create(Households.class, worker -> {
             if (worker.status == Status.WORKER_EMPLOYED && worker.hasMessageOfType(Messages.WorkerPayment.class)){
-                worker.savings += worker.getMessageOfType(Messages.WorkerPayment.class).wage;
+                worker.wealth += worker.getMessageOfType(Messages.WorkerPayment.class).wage;
                 worker.wage = worker.getMessageOfType(Messages.WorkerPayment.class).wage;
             } else if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
-                worker.savings += worker.unemploymentBenefits;
+                worker.wealth += worker.unemploymentBenefits;
             }
         });
     }
@@ -81,9 +84,20 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> sendDemand() {
         return Action.create(Households.class, worker -> {
             worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.HouseholdDemand.class, (m, l) -> {
-                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wage);
+                //TODO: savings is set to 0 currently -> change this. I am not too sure what the savings would be
+                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
+                worker.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
                 m.sectorOfGoods = worker.getPrng().getNextInt(worker.getGlobals().nbSectors - 1); // random sector to consume from
             });
+        });
+    }
+
+    public static Action<Households> buyGoods() {
+        return Action.create(Households.class, worker -> {
+           if(worker.hasMessageOfType(Messages.PurchaseCompleted.class)){
+               worker.wealth -= worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
+               worker.savings = worker.consumptionBudget - worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
+           }
         });
     }
 

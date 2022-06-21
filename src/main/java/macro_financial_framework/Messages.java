@@ -69,6 +69,10 @@ public class Messages {
         public int demand;
     }
 
+    public static class PurchaseCompleted extends Message {
+        public double spent;
+    }
+
     public static class Fired extends Message{}
 
     public static class FirmsPrice extends Message{

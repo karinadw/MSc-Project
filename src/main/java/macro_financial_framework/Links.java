@@ -9,6 +9,7 @@ public class Links {
     public static class FirmToWorkerLink extends Link.Empty {}
     public static class InvestorToFirmLink extends Link.Empty{}
     public static class FirmToInvestorLink extends Link.Empty{}
+    public static class FirmToBuyerLink extends Link.Empty{}
 
 
 
