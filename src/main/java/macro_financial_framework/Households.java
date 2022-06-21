@@ -8,8 +8,8 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public int sector_skills;
     @Variable
-    public double wealth;
-
+    public double savings;
+    public double wage;
     public double unemploymentBenefits;
     @Variable
     public double productivity;
@@ -52,19 +52,38 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                     if (worker.hasMessageOfType(Messages.Hired.class)) {
                         long firmID = worker.getMessageOfType(Messages.Hired.class).firmID;
                         worker.addLink(firmID, Links.WorkerToFirmLink.class);
+                        worker.send(Messages.Productivity.class, m -> {m.productivity = worker.productivity;}).to(firmID); //sends productivity to the firm its working for
                         worker.status = Status.WORKER_EMPLOYED;
                     }
 
                 });
     }
 
+    public static Action<Households> sendProductivity(){
+        return Action.create(Households.class, worker -> {
+           worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.Productivity.class, (m, l) -> {
+               m.productivity = worker.productivity;
+           });
+        });
+    }
+
     public static Action<Households> receiveIncome() {
         return Action.create(Households.class, worker -> {
             if (worker.status == Status.WORKER_EMPLOYED && worker.hasMessageOfType(Messages.WorkerPayment.class)){
-                worker.wealth += worker.getMessageOfType(Messages.WorkerPayment.class).wage;
+                worker.savings += worker.getMessageOfType(Messages.WorkerPayment.class).wage;
+                worker.wage = worker.getMessageOfType(Messages.WorkerPayment.class).wage;
             } else if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
-                worker.wealth += worker.unemploymentBenefits;
+                worker.savings += worker.unemploymentBenefits;
             }
+        });
+    }
+
+    public static Action<Households> sendDemand() {
+        return Action.create(Households.class, worker -> {
+            worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.HouseholdDemand.class, (m, l) -> {
+                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wage);
+                m.sectorOfGoods = worker.getPrng().getNextInt(worker.getGlobals().nbSectors - 1); // random sector to consume from
+            });
         });
     }
 

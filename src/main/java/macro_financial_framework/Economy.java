@@ -1,34 +1,24 @@
 package macro_financial_framework;
 
 //import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
+
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
-import simudyne.core.annotations.Variable;
 
 import java.util.*;
 
 public class Economy extends Agent<MacroFinancialModel.Globals> {
 
-    //    public HashMap<Long, Integer> applicants;
-//    public HashMap<Long, Integer> FirmVacancies;
-//    public HashMap<Long, Integer> FirmSectors;
-//
-//    public LabourMarket(){
-//        applicants = new HashMap<>();
-//        FirmVacancies = new HashMap<>();
-//        FirmSectors = new HashMap<>();
-//    }
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
-
+    public List<FirmSupplyInformation> firmsSupplyingGoods;
+    public List<HouseholdDemandInformation> householdsDemandingGoods;
     public HashMap<Long, Double> priceOfGoods;
-
-    public Economy(){
-        priceOfGoods = new HashMap<Long, Double>();
-    }
+    public HashMap<Long, Double> firmWages;
+    public HashMap<Long, Double> firmProductivity;
 
 
-    public static Action<Economy> AssignInvestorToFirm(){
+    public static Action<Economy> AssignInvestorToFirm() {
         return Action.create(Economy.class, market -> {
             List<Long> allHouseholds = new ArrayList<Long>();
             market.getMessagesOfType(Messages.ApplyForInvestor.class).forEach(msg -> {
@@ -40,7 +30,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 allFirms.add(msg.getSender());
             });
 
-            for(int i = 0; i < allFirms.size(); i++){
+            for (int i = 0; i < allFirms.size(); i++) {
                 long investorID = allHouseholds.get(i);
                 long firmID = allFirms.get(i);
 
@@ -56,14 +46,14 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Economy> SetFirmWages(){
+    public static Action<Economy> SetFirmWages() {
         return Action.create(Economy.class, market -> {
             // creating a hashmap tp store all the sectors and their corresponding wage
             HashMap<Integer, Double> sectorWages = new HashMap<Integer, Double>();
             int numberOfSectors = market.getGlobals().nbSectors; // not adding -1 and instead keeping i<numberOfSector instead of <=
-            for(int i = 0; i < numberOfSectors; i++){
+            for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
-                double wage = market.getPrng().uniform(1000.00,3000.00).sample();
+                double wage = market.getPrng().uniform(1000.00, 3000.00).sample();
                 sectorWages.put(sector, wage);
             }
 
@@ -77,14 +67,30 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Economy> setFirmPriceOfGoods(){
+    public static Action<Economy> setFirmPriceOfGoods() {
         return Action.create(Economy.class, market -> {
-           market.getMessagesOfType(Messages.priceOfGoods.class).forEach(msg -> {
-               market.priceOfGoods.put(msg.getSender(), msg.price);
-           });
+            market.getMessagesOfType(Messages.priceOfGoods.class).forEach(msg -> {
+                market.priceOfGoods.put(msg.getSender(), msg.price);
+            });
         });
     }
 
+    public static Action<Economy> setFirmPriceAndProductivity() {
+        return Action.create(Economy.class, market -> {
+            market.getMessagesOfType(Messages.FirmsPrice.class).forEach(msg -> {
+                market.priceOfGoods.put(msg.getSender(), msg.price);
+                market.firmProductivity.put(msg.getSender(), msg.productivity);
+            });
+        });
+    }
+
+    public static Action<Economy> setWages() {
+        return Action.create(Economy.class, market -> {
+            market.getMessagesOfType(Messages.Wages.class).forEach(msg -> {
+                market.firmWages.put(msg.getSender(), msg.wage);
+            });
+        });
+    }
 
 
     public static Action<Economy> MatchFirmsAndWorkers() {
@@ -130,7 +136,38 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+
+
+    public static Action<Economy> sendDemandToFirm() {
+        return Action.create(Economy.class, economy -> {
+//            economy.supplyOfFirms.clear();
+            economy.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
+                economy.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.sector, firmSupply.output, firmSupply.price));
+            });
+
+//            economy.demandOfHousehold.clear();
+            economy.getMessagesOfType(Messages.HouseholdDemand.class).forEach(householdDemand -> {
+                economy.householdsDemandingGoods.add(new HouseholdDemandInformation(householdDemand.getSender(), householdDemand.sectorOfGoods, householdDemand.consumptionBudget));
+            });
+
+
+            // as of now just matching the good that the household is requesting to the sector of the firm
+            // sending the demand for that good
+            //TODO: households select good of lowest price
+            economy.householdsDemandingGoods.forEach(household -> {
+
+                Optional<FirmSupplyInformation> firmToPurchaseFrom = economy.firmsSupplyingGoods.stream().filter(firm -> firm.sectorOfFirm == household.sectorOfGoodsToPurchase).findAny();
+
+                // sends a message to the firm with the ID of the household and the amount of goods it wants to purchase from that firm
+                if (firmToPurchaseFrom.isPresent()) {
+                    FirmSupplyInformation firmSupply = firmToPurchaseFrom.get();
+                    int goodsDemanded = (int) Math.floor(household.consumptionBudget / firmSupply.price);
+                    economy.send(Messages.HouseholdWantsToPurchase.class, messageOfHouseholdDemand -> {
+                        messageOfHouseholdDemand.HouseholdID = household.ID;
+                        messageOfHouseholdDemand.demand = goodsDemanded;
+                    }).to(firmSupply.ID);
+                }
+            });
+        });
+    }
 }
-
-
-

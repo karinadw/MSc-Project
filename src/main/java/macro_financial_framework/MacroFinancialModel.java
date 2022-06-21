@@ -7,6 +7,7 @@ import simudyne.core.abm.Split;
 import simudyne.core.annotations.Input;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 
 public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Globals> {
@@ -19,10 +20,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public long nbFirms = 50;
 
         @Input
-        public long nbWorkers  = 100;
+        public long nbWorkers = 100;
 
         @Input
         public int nbSectors = 10;
+
+        @Input
+        public double c = 0.5d;
 
     }
 
@@ -50,19 +54,23 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         });
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
-            household.wealth = 0;
+            household.savings = 0;
             household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00) / 2; // average of above and below 24 years
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
-        Group<Economy> Economy = generateGroup(Economy.class, 1, market ->{
+        Group<Economy> Economy = generateGroup(Economy.class, 1, market -> {
             market.firmsHiring = new ArrayList<>();
             market.availableWorkers = new ArrayList<>();
+            market.householdsDemandingGoods = new ArrayList<> ();
+            market.firmsSupplyingGoods = new ArrayList<> ();
+            market.priceOfGoods = new HashMap<Long, Double>();
+            market.firmWages = new HashMap<Long, Double>();
+            market.firmProductivity = new HashMap<Long, Double>();
         });
 
         HouseholdGroup.fullyConnected(Economy, Links.WorkerToEconomyLink.class);
         FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
-
 
 
         super.setup();
@@ -110,8 +118,18 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                             Firms.updateVacancies()
                     ));
 
+            run(Households.sendProductivity(), Firms.getProductivityToSetVariable());
+
             // workers get paid the wage offered by their firm and investors get paid dividends
             run(Firms.payWorkers(), Households.receiveIncome());
+
+            run(
+                    Split.create(
+                            Households.sendDemand(),
+                            Firms.sendSupply()),
+                    Economy.sendDemandToFirm(),
+                    Firms.receiveDemand()
+            );
 
             // assuming 12 ticks represent a year
             // annually firms fire workers and workers update their availabilities

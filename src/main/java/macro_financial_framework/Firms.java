@@ -14,19 +14,26 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public int vacancies;
 
+    @Variable
+    public int workers;
     public int sizeOfCompany;
     @Variable
     public int sector;
-
+    @Variable
+    public double deposits;
+    @Variable
+    public double profit;
     @Variable
     public double wage;
-
     @Input
     public double firingRate;
-
     public double priceOfGoods;
-
+    @Variable
     public double productivity;
+    @Variable
+    public long output;
+    @Variable
+    public int demand;
 
 
     public static Action<Firms> SetVacancies(){
@@ -48,7 +55,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     if (firm.sizeOfCompany == 0) {
                         firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average
                     } else if (firm.sizeOfCompany == 1){
-                        firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium sized companies pay a wage that can be slightly lower or higher than average
+                        firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium-sized companies pay a wage that can be slightly lower or higher than average
                     } else {
                         firm.wage = msg.wage + firm.getPrng().uniform(100.00, 200.00).sample(); // big companies pay a wage that is higher than the average for the sector
                     }
@@ -59,13 +66,11 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> SetPriceOfGoods(){
         return Action.create(Firms.class, firm -> {
-            double price = firm.getPrng().getNextDouble(1000.00);
-            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.priceOfGoods.class, (priceOfGoods, firmToEconomyLink) -> {
-                priceOfGoods.price = price;
-            });
+            double price = firm.getPrng().getNextDouble(10000.00);
             firm.priceOfGoods = price;
         });
     }
+
 
     public static Action<Firms> FindInvestors() {
         // send info to the economy agent to find an investor
@@ -102,8 +107,63 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                 firm.getMessagesOfType(Messages.NewEmployee.class).forEach(msg -> {
                     firm.addLink(msg.workerID, Links.FirmToWorkerLink.class);
                     firm.vacancies--;
+                    firm.workers += 1;
                 });
             }
+        });
+    }
+
+
+    public static Action<Firms> getProductivityToSetVariable() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.Productivity.class)) {
+                firm.getMessagesOfType(Messages.Productivity.class).forEach(msg -> {
+                    firm.productivity += msg.productivity;
+                });
+            }
+
+            firm.productivity /= firm.workers;
+            firm.output = (long) (firm.productivity * firm.workers);
+            firm.deposits = firm.wage * firm.output * 2.0 * firm.getPrng().uniform(0, 1).sample() ;
+            firm.profit = (firm.priceOfGoods * Math.min(firm.output, firm.demand)) - (firm.wage * firm.output);
+        });
+    }
+
+    public static Action<Firms> sendSupply() {
+        return Action.create(Firms.class, firm -> {
+           firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmSupply.class, (m, l) -> {
+               m.output = firm.output;
+               m.price = firm.priceOfGoods;
+               m.sector = firm.sector;
+           });
+        });
+    }
+
+    public static Action<Firms> receiveDemand() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
+                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(msg -> {
+                    firm.demand += msg.demand;
+                });
+            }
+        });
+    }
+
+    public static Action<Firms> sendPrice(){
+        return Action.create(Firms.class, firm -> {
+           firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmsPrice.class, (m, l) -> {
+               m.price = firm.priceOfGoods;
+               m.output = firm.output;
+               m.productivity = firm.productivity;
+           });
+        });
+    }
+
+    public static Action<Firms> sendWages(){
+        return Action.create(Firms.class, firm -> {
+            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.Wages.class, (m, l) -> {
+                m.wage = firm.wage;
+            });
         });
     }
 
@@ -137,7 +197,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             int i = 0;
             while(i < numberOfWorkersToFire){
                 double workerProductivity = workersProductivity.get(i); // if workers have a productivity above 0.9 they won't get fired
-                if (workerProductivity< 0.9) {
+                if (workerProductivity < 0.9) {
                     firm.send(Messages.Fired.class).to(workersID.get(i));
                     firm.removeLinksTo(workersID.get(i));
                     firm.vacancies++;
