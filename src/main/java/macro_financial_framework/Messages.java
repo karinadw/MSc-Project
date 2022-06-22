@@ -85,6 +85,10 @@ public class Messages {
         public double wage;
     }
 
+    public static class PayInvestors extends Message {
+        public double dividend;
+    }
+
 
 }
 

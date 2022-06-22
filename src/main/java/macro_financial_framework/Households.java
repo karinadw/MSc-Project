@@ -23,7 +23,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> ApplyForInvestor() {
         return Action.create(Households.class, investor -> {
             // determine who is an investor and not and connect the investors to firms
-            investor.getLinks(Links.WorkerToEconomyLink.class).send(Messages.ApplyForInvestor.class);
+            investor.getLinks(Links.HouseholdToEconomy.class).send(Messages.ApplyForInvestor.class);
         });
     }
 
@@ -40,7 +40,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Households.class,
                 worker -> {
                     if (worker.status == Status.WORKER_UNEMPLOYED) {
-                        worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.JobApplication.class, (msg, link) -> {
+                        worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.JobApplication.class, (msg, link) -> {
                             msg.productivity = worker.productivity;
                             msg.sector = worker.sector_skills;
                         });
@@ -83,7 +83,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Households> sendDemand() {
         return Action.create(Households.class, worker -> {
-            worker.getLinks(Links.WorkerToEconomyLink.class).send(Messages.HouseholdDemand.class, (m, l) -> {
+            worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.HouseholdDemand.class, (m, l) -> {
                 //TODO: savings is set to 0 currently -> change this. I am not too sure what the savings would be
                 m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
                 worker.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
@@ -97,6 +97,14 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
            if(worker.hasMessageOfType(Messages.PurchaseCompleted.class)){
                worker.wealth -= worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
                worker.savings = worker.consumptionBudget - worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
+           }
+        });
+    }
+
+    public static Action<Households> getDividends() {
+        return Action.create(Households.class, investor -> {
+           if (investor.hasMessageOfType(Messages.PayInvestors.class)){
+               investor.wealth += investor.getMessageOfType(Messages.PayInvestors.class).dividend;
            }
         });
     }

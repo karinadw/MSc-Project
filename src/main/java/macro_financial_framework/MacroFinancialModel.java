@@ -26,7 +26,10 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public int nbSectors = 10;
 
         @Input
-        public double c = 0.5d;
+        public double c = 0.5d; // this is for calculating the consumption budget
+
+        @Input
+        public double alpha = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
 
     }
 
@@ -36,7 +39,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         createLongAccumulator("firm_vacancies");
 
         registerAgentTypes(Firms.class, Households.class, Economy.class);
-        registerLinkTypes(Links.WorkerToEconomyLink.class,
+        registerLinkTypes(Links.HouseholdToEconomy.class,
                 Links.FirmToEconomyLink.class,
                 Links.FirmToWorkerLink.class,
                 Links.WorkerToFirmLink.class,
@@ -63,14 +66,14 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Group<Economy> Economy = generateGroup(Economy.class, 1, market -> {
             market.firmsHiring = new ArrayList<>();
             market.availableWorkers = new ArrayList<>();
-            market.householdsDemandingGoods = new ArrayList<> ();
-            market.firmsSupplyingGoods = new ArrayList<> ();
+            market.householdsDemandingGoods = new ArrayList<>();
+            market.firmsSupplyingGoods = new ArrayList<>();
             market.priceOfGoods = new HashMap<Long, Double>();
             market.firmWages = new HashMap<Long, Double>();
             market.firmProductivity = new HashMap<Long, Double>();
         });
 
-        HouseholdGroup.fullyConnected(Economy, Links.WorkerToEconomyLink.class);
+        HouseholdGroup.fullyConnected(Economy, Links.HouseholdToEconomy.class);
         FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
 
 
@@ -82,7 +85,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         super.step();
 
         // set everything up in the first tick
-        if (getContext().getTick() == 0){
+        if (getContext().getTick() == 0) {
 
             // firms set their vacancies according to their size
             run(Firms.SetVacancies());
@@ -103,42 +106,46 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         }
 
-        if(getContext().getTick() > 0){
-            // workers apply for jobs and firms that have vacancies hire
-            // firms set their wage according to the sector they're in
-            run(
-                    Split.create(
-                            Households.applyForJob(),
-                            Firms.sendVacancies()),
-                    Split.create(
-                            Economy.SetFirmWages(),
-                            Economy.MatchFirmsAndWorkers()),
-                    Split.create(
-                            Firms.SetSectorSpecificWages(),
-                            Households.updateAvailability(),
-                            Firms.updateVacancies()
-                    ));
+        // workers apply for jobs and firms that have vacancies hire
+        // firms set their wage according to the sector they're in
+        run(
+                Split.create(
+                        Households.applyForJob(),
+                        Firms.sendVacancies()),
+                Split.create(
+                        Economy.SetFirmWages(),
+                        Economy.MatchFirmsAndWorkers()),
+                Split.create(
+                        Firms.SetSectorSpecificWages(),
+                        Households.updateAvailability(),
+                        Firms.updateVacancies()
+                ));
 
-            run(Households.sendProductivity(), Firms.getProductivityToSetVariable());
+        run(Households.sendProductivity(), Firms.getProductivityToSetVariable());
 
-            // workers get paid the wage offered by their firm and investors get paid dividends
-            run(Firms.payWorkers(), Households.receiveIncome());
+        // workers get paid the wage offered by their firm and investors get paid dividends
+        run(Firms.payWorkers(), Households.receiveIncome());
 
-            run(
-                    Split.create(
-                            Households.sendDemand(),
-                            Firms.sendSupply()),
-                    Economy.sendDemandToFirm(),
-                    Firms.receiveDemandAndSell(),
-                    Households.buyGoods()
-            );
+        run(
+                Split.create(
+                        Households.sendDemand(),
+                        Firms.sendSupply()),
+                Economy.sendDemandToFirm(),
+                Firms.receiveDemandAndSell(),
+                Households.buyGoods()
+        );
 
-            // assuming 12 ticks represent a year
-            // annually firms fire workers and workers update their availabilities
-            if (getContext().getTick() % 12 == 0) {
-                run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
-            }
+        //firms pay out dividends from profits to investors
+        run(Firms.payInvestors(), Households.getDividends());
+
+        run(Firms.calculateProfits());
+
+        // assuming 12 ticks represent a year
+        // annually firms fire workers and workers update their availabilities
+        if (getContext().getTick() % 12 == 0) {
+            run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
         }
+
     }
 
 }
