@@ -55,6 +55,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 Links.EconomyToFirm.class);
     }
     int i = 0;
+    int householdNumber = 0;
     @Override
     public void setup() {
 
@@ -75,6 +76,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
             household.wealth = 0;
+            // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
+            if (householdNumber < getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers)){
+                household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
+            } else {
+                household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
+            }
             household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
             household.productivity = household.getPrng().uniform(0.5, 1).sample();

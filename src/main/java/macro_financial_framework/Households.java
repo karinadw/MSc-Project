@@ -10,7 +10,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double wealth;
 
-    public double savings = 0.0d;
+    public double savings; // their initial wealth
     public double wage;
     public double unemploymentBenefits;
     @Variable
