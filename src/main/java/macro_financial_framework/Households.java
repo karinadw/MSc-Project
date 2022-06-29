@@ -85,8 +85,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Households.class, worker -> {
             worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.HouseholdDemand.class, (m, l) -> {
                 //TODO: savings is set to 0 currently -> change this. I am not too sure what the savings would be
-                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
+                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth); // I can set the saving to a certain value initially -> shouldn't be uniform
                 worker.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
+
                 m.sectorOfGoods = worker.getPrng().getNextInt(worker.getGlobals().nbSectors - 1); // random sector to consume from
             });
         });

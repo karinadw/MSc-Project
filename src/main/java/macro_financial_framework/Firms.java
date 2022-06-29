@@ -29,7 +29,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double productivity;
     @Variable
-    public long output;
+    public long stock;
     @Variable
     public int demand;
     @Variable
@@ -37,11 +37,14 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double earnings = 0.0d;
     public double dividend = 0;
+    public double production;
+    public double targetProduction;
 
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
             // set vacancies according to firm size
+            //TODO: check if logic makes sense
             if (firm.sizeOfCompany == 0) {
                 firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
             } else if (firm.sizeOfCompany == 1) {
@@ -57,7 +60,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.hasMessageOfType(Messages.FirmWage.class)) {
                 firm.getMessagesOfType(Messages.FirmWage.class).forEach(msg -> {
                     if (firm.sizeOfCompany == 0) {
-                        firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average
+                        firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
                     } else if (firm.sizeOfCompany == 1) {
                         firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium-sized companies pay a wage that can be slightly lower or higher than average
                     } else {
@@ -70,7 +73,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> SetPriceOfGoods() {
         return Action.create(Firms.class, firm -> {
-            double price = firm.getPrng().getNextDouble(10000.00);
+            double price = firm.getPrng().uniform(10.00, 10000.00).sample();
             firm.priceOfGoods = price;
         });
     }
@@ -118,36 +121,40 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     }
 
 
-    public static Action<Firms> getProductivityToSetVariable() {
+    public static Action<Firms> CalculateFirmProductivity() {
         return Action.create(Firms.class, firm -> {
             if (firm.hasMessageOfType(Messages.Productivity.class)) {
                 firm.getMessagesOfType(Messages.Productivity.class).forEach(msg -> {
                     firm.productivity += msg.productivity;
+                    firm.productivity /= firm.workers;
                 });
+
+            // if the firm doesn't have workers, it's productivity is set to 0
+            } else {
+                firm.productivity = 0;
             }
+        });
+    }
 
-            firm.productivity /= firm.workers;
-
+    public static Action<Firms> FirmsProduce() {
+        return Action.create(Firms.class, firm -> {
             // depending on the size of the firm -> workers can produce more or less goods
             // this is assuming that larger companies have more facilities
             //TODO: check if this is a fair assumption
             if (firm.sizeOfCompany == 0) {
-                firm.output = (long) Math.floor(firm.productivity * (firm.workers / 1));
+                firm.stock = (long) Math.floor(firm.productivity * (firm.workers / 1));
             } else if (firm.sizeOfCompany == 1) {
-                firm.output = (long) Math.floor(firm.productivity * (firm.workers / 0.5));
+                firm.stock = (long) Math.floor(firm.productivity * (firm.workers / 0.5));
             } else {
-                firm.output = (long) Math.floor(firm.productivity * (firm.workers / 0.25));
+                firm.stock = (long) Math.floor(firm.productivity * (firm.workers / 0.25));
             }
-            // this should be math.min when we add the intermediate goods.
-//            firm.deposits = firm.wage * firm.output * 2.0 * firm.getPrng().uniform(0, 1).sample();
-//            firm.profit = (firm.priceOfGoods * Math.min(firm.output, firm.demand)) - (firm.wage * firm.output);
         });
     }
 
     public static Action<Firms> sendSupply() {
         return Action.create(Firms.class, firm -> {
             firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmSupply.class, (m, l) -> {
-                m.output = firm.output;
+                m.output = firm.stock;
                 m.price = firm.priceOfGoods;
                 m.sector = firm.sector;
             });
@@ -165,7 +172,9 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             }
 
             // the initial stock of the product of that firm
-            double initialOutput = firm.output;
+            // I am storing how much the firm produced, as when the selling occurs the stock will go down
+            // needed for various metrics and calculations
+            firm.production = firm.stock;
 
             // iterate over all the
             if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
@@ -177,32 +186,32 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     // add link to the household
                     // send the price of purchase
                     //TODO: sort out what's happening with the inventory -> it should be used, in fact I should use LIFO
-                    if ((firm.output - demand) >= 0 && demand > 0) {
+                    if ((firm.stock - demand) >= 0 && demand > 0) {
                         long amountSold = demand;
                         firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
                         double price = firm.priceOfGoods * amountSold;
                         firm.send(Messages.PurchaseCompleted.class, m -> {
                             m.spent = price;
                         }).to(msg.HouseholdID);
-                        firm.output -= amountSold;
+                        firm.stock -= amountSold;
                         firm.earnings += price;
                         firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
-                    } else if (firm.output > 0 && demand > 0 && (firm.output - demand) < 0) {
-                        long amountSold = firm.output;
+                    } else if (firm.stock > 0 && demand > 0 && (firm.stock - demand) < 0) {
+                        long amountSold = firm.stock;
                         firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
                         double price = firm.priceOfGoods * amountSold;
                         firm.send(Messages.PurchaseCompleted.class, m -> {
                             m.spent = price;
                         }).to(msg.HouseholdID);
-                        firm.output -= amountSold;
+                        firm.stock -= amountSold;
                         firm.earnings += price;
                         firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
                     }
                 });
 
-                // whatever has not been sold it now kept in stock
-                firm.inventory += firm.output;
-                firm.output = 0;
+                // whatever has not been sold it now kept in inventory
+                firm.inventory += firm.stock;
+                firm.stock = 0;
 
             }
         });
@@ -235,7 +244,6 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             // the profit is the difference between the cost of production (wage * nb of employees) and the products sold
             // might be negative as even if firms don't sell anything, they need to pay workers
             firm.profit += firm.earnings - (firm.wage * firm.workers) - firm.dividend;
-//                System.out.println("earnings" + firm.earnings + "wage" + firm.wage + "workers" + firm.workers);
         });
     }
 
@@ -243,19 +251,23 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firms.class, firm -> {
             firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmsPrice.class, (m, l) -> {
                 m.price = firm.priceOfGoods;
-                m.output = firm.output;
-                m.productivity = firm.productivity;
+                m.output = firm.stock;
             });
         });
     }
 
-    public static Action<Firms> sendWages() {
-        return Action.create(Firms.class, firm -> {
-            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.Wages.class, (m, l) -> {
-                m.wage = firm.wage;
-            });
-        });
-    }
+//    public static Action<Firms> AdjustVariable() {
+//        return Action.create(Firms.class, firm -> {
+//            // if the firm is productive, then re-calculate strategy
+//            if (firm.productivity > 0) {
+//                if (firm.production < firm.demand) {
+//                    firm.targetProduction =
+//
+//                }
+//            }
+//        });
+//    }
+
 
     public static Action<Firms> FireWorkers() {
         return Action.create(Firms.class, firm -> {

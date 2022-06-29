@@ -13,9 +13,15 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     public List<FirmID> firmsHiring;
     public List<FirmSupplyInformation> firmsSupplyingGoods;
     public List<HouseholdDemandInformation> householdsDemandingGoods;
-    public HashMap<Long, Double> priceOfGoods;
-    public HashMap<Long, Double> firmWages;
-    public HashMap<Long, Double> firmProductivity;
+    public HashMap<Double, Double> priceOfGoods;
+//    public HashMap<Long, Double> firmWages;
+//    public HashMap<Long, Double> firmProductivity;
+    // this is to calculate the average price -> TODO: find a better way of doing this
+    private double numerator = 0; // this is the sum of the product of the price and output for each firm
+    private double denominator = 0; // this is the sum of the output of every firm
+    public double averagePrice;
+
+
 
 
     public static Action<Economy> AssignInvestorToFirm() {
@@ -53,7 +59,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             int numberOfSectors = market.getGlobals().nbSectors; // not adding -1 and instead keeping i<numberOfSector instead of <=
             for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
-                double wage = market.getPrng().uniform(1000.00, 3000.00).sample();
+                double wage = market.getPrng().uniform(2000.00, 4000.00).sample();
                 sectorWages.put(sector, wage);
             }
 
@@ -67,30 +73,14 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Economy> setFirmPriceOfGoods() {
+    public static Action<Economy> GetPrices() {
         return Action.create(Economy.class, market -> {
-            market.getMessagesOfType(Messages.priceOfGoods.class).forEach(msg -> {
-                market.priceOfGoods.put(msg.getSender(), msg.price);
+            market.getMessagesOfType(Messages.FirmsPrice.class).forEach(priceMessage -> {
+                market.priceOfGoods.put(priceMessage.price, priceMessage.output);
             });
         });
     }
 
-    public static Action<Economy> setFirmPriceAndProductivity() {
-        return Action.create(Economy.class, market -> {
-            market.getMessagesOfType(Messages.FirmsPrice.class).forEach(msg -> {
-                market.priceOfGoods.put(msg.getSender(), msg.price);
-                market.firmProductivity.put(msg.getSender(), msg.productivity);
-            });
-        });
-    }
-
-    public static Action<Economy> setWages() {
-        return Action.create(Economy.class, market -> {
-            market.getMessagesOfType(Messages.Wages.class).forEach(msg -> {
-                market.firmWages.put(msg.getSender(), msg.wage);
-            });
-        });
-    }
 
 
     public static Action<Economy> MatchFirmsAndWorkers() {
@@ -107,7 +97,8 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 int vacancies = firm.vacancies;
                 for (int x = 0; x < vacancies; x++) {
                     //TODO: choose worker with preferences of higher productivity
-                    Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findAny();
+                    market.availableWorkers.sort(Comparator.comparing(worker -> worker.productivity));
+                    Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();
                     if (potentialWorkerGoodCandidate.isPresent()) {
 
                         // sends message to the workers
@@ -168,6 +159,17 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                     }).to(firmSupply.ID);
                 }
             });
+        });
+    }
+
+    public static Action<Economy> CalculateAndSendAveragePrice() {
+        return Action.create(Economy.class, market -> {
+            market.priceOfGoods.forEach((price, output) -> {
+                market.numerator += (price * output);
+                market.denominator += output;
+            });
+            market.averagePrice = market.numerator / market.denominator;
+            market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class, market.averagePrice);
         });
     }
 }

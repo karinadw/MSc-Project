@@ -29,7 +29,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public double c = 0.5d; // this is for calculating the consumption budget
 
         @Input
+        //TODO: refactor this as I have named the productivity of a firm alpha
         public double alpha = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
+
+        @Input
+        public int nbGoods = 3;
+
+        public HashMap<Integer, Long> goodExchangeIDs;
 
     }
 
@@ -45,11 +51,21 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 Links.WorkerToFirmLink.class,
                 Links.FirmToInvestorLink.class,
                 Links.InvestorToFirmLink.class,
-                Links.FirmToBuyerLink.class);
+                Links.FirmToBuyerLink.class,
+                Links.EconomyToFirm.class);
     }
-
+    int i = 0;
     @Override
     public void setup() {
+
+        getGlobals().goodExchangeIDs = new HashMap<>();
+
+        Group<GoodsMarket> goodsMarket = generateGroup(GoodsMarket.class, getGlobals().nbGoods, goodsVariable -> {
+            goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
+            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
+            getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
+            i++;
+        });
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
@@ -60,7 +76,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
             household.wealth = 0;
             household.productivity = household.getPrng().getNextInt(10);
-            household.unemploymentBenefits = (61.05 + 77.00) / 2; // average of above and below 24 years
+            household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
         Group<Economy> Economy = generateGroup(Economy.class, 1, market -> {
@@ -68,13 +84,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             market.availableWorkers = new ArrayList<>();
             market.householdsDemandingGoods = new ArrayList<>();
             market.firmsSupplyingGoods = new ArrayList<>();
-            market.priceOfGoods = new HashMap<Long, Double>();
-            market.firmWages = new HashMap<Long, Double>();
-            market.firmProductivity = new HashMap<Long, Double>();
+            market.priceOfGoods = new HashMap<Double, Double>();
         });
 
         HouseholdGroup.fullyConnected(Economy, Links.HouseholdToEconomy.class);
         FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
+        Economy.fullyConnected(FirmGroup, Links.EconomyToFirm.class);
 
 
         super.setup();
@@ -91,7 +106,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             run(Firms.SetVacancies());
 
             //the firm sets the prices of the goods it produces and the economy stores the firm ID and price of good produced
-            run(Firms.SetPriceOfGoods(), Economy.setFirmPriceOfGoods());
+            run(Firms.SetPriceOfGoods());
 
             // dividing households into investors and workers
             run(
@@ -121,7 +136,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Firms.updateVacancies()
                 ));
 
-        run(Households.sendProductivity(), Firms.getProductivityToSetVariable());
+        run(Households.sendProductivity(), Firms.CalculateFirmProductivity());
+
+        run(Firms.FirmsProduce());
 
         // workers get paid the wage offered by their firm and investors get paid dividends
         run(Firms.payWorkers(), Households.receiveIncome());
@@ -139,6 +156,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         run(Firms.payInvestors(), Households.getDividends());
 
         run(Firms.calculateProfits());
+
+        run(Firms.sendPrice(), Economy.GetPrices());
+        run(Economy.CalculateAndSendAveragePrice());
 
         // assuming 12 ticks represent a year
         // annually firms fire workers and workers update their availabilities

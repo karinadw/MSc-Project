@@ -15,9 +15,6 @@ public class Messages {
         public double wage;
     }
 
-    public static class priceOfGoods extends Message {
-        public double price;
-    }
 
     public static class FirmAssignedToInvestor extends Message {
         public long firmID;
@@ -78,16 +75,13 @@ public class Messages {
     public static class FirmsPrice extends Message{
         public double output;
         public double price;
-        public double productivity;
-    }
-
-    public static class Wages extends Message {
-        public double wage;
     }
 
     public static class PayInvestors extends Message {
         public double dividend;
     }
+
+    public static class AveragePrice extends Message.Double {}
 
 
 }
