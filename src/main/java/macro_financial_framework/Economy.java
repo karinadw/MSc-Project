@@ -73,6 +73,27 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+    public static Action<Economy> setFirmGood() {
+        return Action.create(Economy.class, market -> {
+            // creating a hashmap tp store all the sectors and their corresponding good traded
+            HashMap<Integer, Integer> sectorGood = new HashMap<Integer, Integer>();
+            int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
+            for (int i = 0; i < numberOfGoods; i++) {
+                int sector = i;
+                int good = market.getPrng().getNextInt(numberOfGoods);
+                sectorGood.put(sector, good);
+            }
+
+            market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
+                int firmSector = m.sector;
+                int goodTraded = sectorGood.get(firmSector);
+                market.send(Messages.FirmGood.class, msg -> {
+                    msg.good = goodTraded;
+                }).to(m.getSender());
+            });
+        });
+    }
+
     public static Action<Economy> GetPrices() {
         return Action.create(Economy.class, market -> {
             market.getMessagesOfType(Messages.FirmsPrice.class).forEach(priceMessage -> {

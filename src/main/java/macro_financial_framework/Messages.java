@@ -15,6 +15,10 @@ public class Messages {
         public double wage;
     }
 
+    public static class FirmGood extends Message {
+        public int good;
+    }
+
 
     public static class FirmAssignedToInvestor extends Message {
         public long firmID;

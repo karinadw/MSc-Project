@@ -39,6 +39,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double dividend = 0;
     public double production;
     public double targetProduction;
+    public int good;
 
 
     public static Action<Firms> SetVacancies() {
@@ -66,6 +67,16 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     } else {
                         firm.wage = msg.wage + firm.getPrng().uniform(100.00, 200.00).sample(); // big companies pay a wage that is higher than the average for the sector
                     }
+                });
+            }
+        });
+    }
+
+    public static Action<Firms> SetSectorSpecificGood() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.FirmGood.class)) {
+                firm.getMessagesOfType(Messages.FirmGood.class).forEach(msg -> {
+                    firm.good = msg.good;
                 });
             }
         });

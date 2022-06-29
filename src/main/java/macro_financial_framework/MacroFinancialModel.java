@@ -44,7 +44,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         createLongAccumulator("firm_vacancies");
 
-        registerAgentTypes(Firms.class, Households.class, Economy.class);
+        registerAgentTypes(Firms.class,
+                Households.class,
+                Economy.class,
+                GoodsMarket.class);
+
         registerLinkTypes(Links.HouseholdToEconomy.class,
                 Links.FirmToEconomyLink.class,
                 Links.FirmToWorkerLink.class,
@@ -136,9 +140,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Firms.sendVacancies()),
                 Split.create(
                         Economy.SetFirmWages(),
+                        Economy.setFirmGood(),
                         Economy.MatchFirmsAndWorkers()),
                 Split.create(
                         Firms.SetSectorSpecificWages(),
+                        Firms.SetSectorSpecificGood(),
                         Households.updateAvailability(),
                         Firms.updateVacancies()
                 ));
