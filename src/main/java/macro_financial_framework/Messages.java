@@ -57,16 +57,16 @@ public class Messages {
     public static class FirmSupply extends Message {
         public double price;
         public long output;
-        public int sector;
+//        public int sector;
     }
 
     public static class HouseholdDemand extends Message {
-        public int sectorOfGoods;
+//        public int sectorOfGoods;
         public double consumptionBudget;
     }
 
     public static class HouseholdWantsToPurchase extends Message {
-        public long HouseholdID;
+        public long bought ;
         public int demand;
     }
 

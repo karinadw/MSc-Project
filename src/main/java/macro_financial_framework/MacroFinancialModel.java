@@ -26,7 +26,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public int nbSectors = 10;
 
         @Input
-        public double c = 0.5d; // this is for calculating the consumption budget
+        public double c = 0.025d; // this is for calculating the consumption budget
 
         @Input
         //TODO: refactor this as I have named the productivity of a firm alpha
@@ -66,41 +66,71 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         getGlobals().goodExchangeIDs = new HashMap<>();
 
         Group<GoodsMarket> goodsMarket = generateGroup(GoodsMarket.class, getGlobals().nbGoods, goodsVariable -> {
+            goodsVariable.householdsDemandingGoods = new ArrayList<>();
+            goodsVariable.firmsSupplyingGoods = new ArrayList<>();
             goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
             goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
+            if (i == 2){
+                goodsVariable.competitive = false; // goods only purchased by very wealthy individuals
+            } else {
+                goodsVariable.competitive = true; // this is common goods accesible to everyone, more common goods
+            }
             i++;
         });
+
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
             firm.firingRate = 0.05;
             firm.sizeOfCompany = firm.getPrng().getNextInt(2); //start-up: 0, medium-sized: 1, large company: 2
         });
+
+
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
             household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
-            household.wealth = 0;
+            household.accumulatedSalary = 0;
+            // skewed distribution of wealth
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
+            household.budget = new HashMap<Integer, Double>();
             if (householdNumber < getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers)){
+                // common individuals
                 household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
+                double moneyToSpend = 0.025 * household.savings;
+                for(int j = 0; j < 2; j++){
+                    household.budget.put(j, moneyToSpend / 2);
+                }
             } else {
+                // wealthy individuals
                 household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
+
+                double moneyToSpend = 0.025 * household.savings;
+                // wealthy individuals spend on luxury goods as well
+                for(int j = 0; j <= 2; j++){
+                    household.budget.put(j, moneyToSpend / 3);
+                }
             }
+
             household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
+
+
         Group<Economy> Economy = generateGroup(Economy.class, 1, market -> {
             market.firmsHiring = new ArrayList<>();
             market.availableWorkers = new ArrayList<>();
-            market.householdsDemandingGoods = new ArrayList<>();
-            market.firmsSupplyingGoods = new ArrayList<>();
+//            market.householdsDemandingGoods = new ArrayList<>();
+//            market.firmsSupplyingGoods = new ArrayList<>();
             market.priceOfGoods = new HashMap<Double, Double>();
         });
 
         HouseholdGroup.fullyConnected(Economy, Links.HouseholdToEconomy.class);
         FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
         Economy.fullyConnected(FirmGroup, Links.EconomyToFirm.class);
+
+        // TODO: check why am I getting an error trying to run the line below
+//        GoodsMarket.fullyConnected(Economy, Links.GoodsMarketToEconomy.class);
 
 
         super.setup();
@@ -134,6 +164,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         // workers apply for jobs and firms that have vacancies hire
         // firms set their wage according to the sector they're in
+        // firms decide what good they produce depending on the sector they're in
         run(
                 Split.create(
                         Households.applyForJob(),
@@ -147,7 +178,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Firms.SetSectorSpecificGood(),
                         Households.updateAvailability(),
                         Firms.updateVacancies()
-                ));
+                )
+        );
 
         run(Households.sendProductivity(), Firms.CalculateFirmProductivity());
 
@@ -160,9 +192,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 Split.create(
                         Households.sendDemand(),
                         Firms.sendSupply()),
-                Economy.sendDemandToFirm(),
-                Firms.receiveDemandAndSell(),
-                Households.buyGoods()
+                GoodsMarket.matchSupplyAndDemand(),
+                Split.create(
+                        Firms.receiveDemand(),
+                        Households.updateFromPurchase()
+                )
+
         );
 
         //firms pay out dividends from profits to investors

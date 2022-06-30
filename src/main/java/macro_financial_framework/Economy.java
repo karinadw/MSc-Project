@@ -11,8 +11,8 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
-    public List<FirmSupplyInformation> firmsSupplyingGoods;
-    public List<HouseholdDemandInformation> householdsDemandingGoods;
+//    public List<FirmSupplyInformation> firmsSupplyingGoods;
+//    public List<HouseholdDemandInformation> householdsDemandingGoods;
     public HashMap<Double, Double> priceOfGoods;
 //    public HashMap<Long, Double> firmWages;
 //    public HashMap<Long, Double> firmProductivity;
@@ -78,7 +78,8 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             // creating a hashmap tp store all the sectors and their corresponding good traded
             HashMap<Integer, Integer> sectorGood = new HashMap<Integer, Integer>();
             int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
-            for (int i = 0; i < numberOfGoods; i++) {
+            int numberOfSectors = market.getGlobals().nbSectors;
+            for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
                 int good = market.getPrng().getNextInt(numberOfGoods);
                 sectorGood.put(sector, good);
@@ -150,38 +151,38 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
 
 
-    public static Action<Economy> sendDemandToFirm() {
-        return Action.create(Economy.class, economy -> {
-//            economy.supplyOfFirms.clear();
-            economy.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
-                economy.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.sector, firmSupply.output, firmSupply.price));
-            });
-
-//            economy.demandOfHousehold.clear();
-            economy.getMessagesOfType(Messages.HouseholdDemand.class).forEach(householdDemand -> {
-                economy.householdsDemandingGoods.add(new HouseholdDemandInformation(householdDemand.getSender(), householdDemand.sectorOfGoods, householdDemand.consumptionBudget));
-            });
-
-
-            // as of now just matching the good that the household is requesting to the sector of the firm
-            // sending the demand for that good
-            //TODO: households select good of lowest price
-            economy.householdsDemandingGoods.forEach(household -> {
-
-                Optional<FirmSupplyInformation> firmToPurchaseFrom = economy.firmsSupplyingGoods.stream().filter(firm -> firm.sectorOfFirm == household.sectorOfGoodsToPurchase).findAny();
-
-                // sends a message to the firm with the ID of the household and the amount of goods it wants to purchase from that firm
-                if (firmToPurchaseFrom.isPresent()) {
-                    FirmSupplyInformation firmSupply = firmToPurchaseFrom.get();
-                    int goodsDemanded = (int) Math.floor(household.consumptionBudget / firmSupply.price);
-                    economy.send(Messages.HouseholdWantsToPurchase.class, messageOfHouseholdDemand -> {
-                        messageOfHouseholdDemand.HouseholdID = household.ID;
-                        messageOfHouseholdDemand.demand = goodsDemanded;
-                    }).to(firmSupply.ID);
-                }
-            });
-        });
-    }
+//    public static Action<Economy> sendDemandToFirm() {
+//        return Action.create(Economy.class, economy -> {
+////            economy.supplyOfFirms.clear();
+//            economy.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
+//                economy.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.sector, firmSupply.output, firmSupply.price));
+//            });
+//
+////            economy.demandOfHousehold.clear();
+//            economy.getMessagesOfType(Messages.HouseholdDemand.class).forEach(householdDemand -> {
+//                economy.householdsDemandingGoods.add(new HouseholdDemandInformation(householdDemand.getSender(), householdDemand.sectorOfGoods, householdDemand.consumptionBudget));
+//            });
+//
+//
+//            // as of now just matching the good that the household is requesting to the sector of the firm
+//            // sending the demand for that good
+//            //TODO: households select good of lowest price
+//            economy.householdsDemandingGoods.forEach(household -> {
+//
+//                Optional<FirmSupplyInformation> firmToPurchaseFrom = economy.firmsSupplyingGoods.stream().filter(firm -> firm.sectorOfFirm == household.sectorOfGoodsToPurchase).findAny();
+//
+//                // sends a message to the firm with the ID of the household and the amount of goods it wants to purchase from that firm
+//                if (firmToPurchaseFrom.isPresent()) {
+//                    FirmSupplyInformation firmSupply = firmToPurchaseFrom.get();
+//                    int goodsDemanded = (int) Math.floor(household.consumptionBudget / firmSupply.price);
+//                    economy.send(Messages.HouseholdWantsToPurchase.class, messageOfHouseholdDemand -> {
+//                        messageOfHouseholdDemand.HouseholdID = household.ID;
+//                        messageOfHouseholdDemand.demand = goodsDemanded;
+//                    }).to(firmSupply.ID);
+//                }
+//            });
+//        });
+//    }
 
     public static Action<Economy> CalculateAndSendAveragePrice() {
         return Action.create(Economy.class, market -> {

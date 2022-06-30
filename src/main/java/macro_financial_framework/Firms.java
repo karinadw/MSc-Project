@@ -140,7 +140,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     firm.productivity /= firm.workers;
                 });
 
-            // if the firm doesn't have workers, it's productivity is set to 0
+                // if the firm doesn't have workers, it's productivity is set to 0
             } else {
                 firm.productivity = 0;
             }
@@ -164,70 +164,90 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> sendSupply() {
         return Action.create(Firms.class, firm -> {
-            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmSupply.class, (m, l) -> {
+            firm.send(Messages.FirmSupply.class, m -> {
                 m.output = firm.stock;
                 m.price = firm.priceOfGoods;
-                m.sector = firm.sector;
-            });
+            }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
         });
     }
 
-    public static Action<Firms> receiveDemandAndSell() {
+    public static Action<Firms> receiveDemand() {
         return Action.create(Firms.class, firm -> {
-            // firm receives the demand for its product
-            // just storing the total demand for the product for strategy calculation
-            if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
-                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(msg -> {
-                    firm.demand += msg.demand;
-                });
-            }
 
             // the initial stock of the product of that firm
             // I am storing how much the firm produced, as when the selling occurs the stock will go down
             // needed for various metrics and calculations
             firm.production = firm.stock;
 
-            // iterate over all the
             if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
-                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(msg -> {
-                    long demand = msg.demand;
-//                    long availability = firm.output - demand;
-
-                    // if availability of the good (difference between stock and demand) is greater than 0
-                    // add link to the household
-                    // send the price of purchase
-                    //TODO: sort out what's happening with the inventory -> it should be used, in fact I should use LIFO
-                    if ((firm.stock - demand) >= 0 && demand > 0) {
-                        long amountSold = demand;
-                        firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
-                        double price = firm.priceOfGoods * amountSold;
-                        firm.send(Messages.PurchaseCompleted.class, m -> {
-                            m.spent = price;
-                        }).to(msg.HouseholdID);
-                        firm.stock -= amountSold;
-                        firm.earnings += price;
-                        firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
-                    } else if (firm.stock > 0 && demand > 0 && (firm.stock - demand) < 0) {
-                        long amountSold = firm.stock;
-                        firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
-                        double price = firm.priceOfGoods * amountSold;
-                        firm.send(Messages.PurchaseCompleted.class, m -> {
-                            m.spent = price;
-                        }).to(msg.HouseholdID);
-                        firm.stock -= amountSold;
-                        firm.earnings += price;
-                        firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
-                    }
+                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(purchaseMessage -> {
+                    firm.demand += purchaseMessage.demand;
+                    firm.stock -= purchaseMessage.bought;
                 });
-
-                // whatever has not been sold it now kept in inventory
-                firm.inventory += firm.stock;
-                firm.stock = 0;
-
             }
-        });
 
+            firm.inventory += firm.stock;
+            firm.stock = 0;
+
+        });
     }
+
+//    public static Action<Firms> receiveDemandAndSell() {
+//        return Action.create(Firms.class, firm -> {
+//            // firm receives the demand for its product
+//            // just storing the total demand for the product for strategy calculation
+//            if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
+//                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(msg -> {
+//                    firm.demand += msg.demand;
+//                });
+//            }
+//
+//            // the initial stock of the product of that firm
+//            // I am storing how much the firm produced, as when the selling occurs the stock will go down
+//            // needed for various metrics and calculations
+//            firm.production = firm.stock;
+//
+//            // iterate over all the
+//            if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
+//                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(msg -> {
+//                    long demand = msg.demand;
+////                    long availability = firm.output - demand;
+//
+//                    // if availability of the good (difference between stock and demand) is greater than 0
+//                    // add link to the household
+//                    // send the price of purchase
+//                    //TODO: sort out what's happening with the inventory -> it should be used, in fact I should use LIFO
+//                    if ((firm.stock - demand) >= 0 && demand > 0) {
+//                        long amountSold = demand;
+//                        firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
+//                        double price = firm.priceOfGoods * amountSold;
+//                        firm.send(Messages.PurchaseCompleted.class, m -> {
+//                            m.spent = price;
+//                        }).to(msg.HouseholdID);
+//                        firm.stock -= amountSold;
+//                        firm.earnings += price;
+//                        firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
+//                    } else if (firm.stock > 0 && demand > 0 && (firm.stock - demand) < 0) {
+//                        long amountSold = firm.stock;
+//                        firm.addLink(msg.HouseholdID, Links.FirmToBuyerLink.class);
+//                        double price = firm.priceOfGoods * amountSold;
+//                        firm.send(Messages.PurchaseCompleted.class, m -> {
+//                            m.spent = price;
+//                        }).to(msg.HouseholdID);
+//                        firm.stock -= amountSold;
+//                        firm.earnings += price;
+//                        firm.removeLinksTo(msg.HouseholdID, Links.FirmToBuyerLink.class);
+//                    }
+//                });
+//
+//                // whatever has not been sold it now kept in inventory
+//                firm.inventory += firm.stock;
+//                firm.stock = 0;
+//
+//            }
+//        });
+//
+//    }
 
     public static Action<Firms> payWorkers() {
         // pays the workers
