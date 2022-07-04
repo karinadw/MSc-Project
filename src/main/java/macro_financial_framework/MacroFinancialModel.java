@@ -32,6 +32,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         //TODO: refactor this as I have named the productivity of a firm alpha
         public double alpha = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
 
+        // copied the number from Mark 0 model
+        @Input(name="ettaPlus")
+        public double etta_plus = 0.416d;
+
+        @Input(name="mu")
+        public double mu = 1.0;
+
         @Input
         public int nbGoods = 3;
 
@@ -203,6 +210,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Households.updateFromPurchase()
                 )
         );
+
+        //update the target production to meet the demand
+        run(Firms.adjustPriceProduction());
 
         //after households purchase, the update their consumption budget for each goog
         run(Households.updateConsumptionBudget());
