@@ -37,9 +37,10 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double earnings = 0.0d;
     public double dividend = 0;
-    public double production;
+    public double previousOutput;
     public double targetProduction;
     public int good;
+    public int unemployment;
 
 
     public static Action<Firms> SetVacancies() {
@@ -178,20 +179,23 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             // the initial stock of the product of that firm
             // I am storing how much the firm produced, as when the selling occurs the stock will go down
             // needed for various metrics and calculations
-            firm.production = firm.stock;
+            firm.previousOutput = firm.stock;
+            System.out.println("previous output " + firm.previousOutput);
 
             if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
                 firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(purchaseMessage -> {
                     firm.demand += purchaseMessage.demand;
-                    firm.stock -= purchaseMessage.bought;
-                    // cash received from the goods sold -> without subtracting costs of production and payment to workers/investors
-                    firm.earnings += firm.priceOfGoods;
+                    if (firm.stock > 0) {
+                        firm.stock -= purchaseMessage.bought;
+                        // cash received from the goods sold -> without subtracting costs of production and payment to workers/investors
+                        firm.earnings += firm.priceOfGoods;
+                    }
                 });
+
             }
 
             firm.inventory += firm.stock;
             firm.stock = 0;
-
         });
     }
 
@@ -293,8 +297,17 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public static Action<Firms> adjustPriceProduction() {
         return Action.create(Firms.class, firm -> {
 
+
+            // TODO: check if this should be overall available workers or available workers in this sector
+            if (firm.hasMessageOfType(Messages.CurrentUnemployment.class)) {
+                firm.getMessagesOfType(Messages.CurrentUnemployment.class).forEach(msg -> firm.unemployment = msg.unemployment);
+            }
             // first the firm needs to calculate what the new production goal will be according to the demand it received
-//           firm.targetProduction = firm.production + Math.min(firm.getGlobals().etta_plus * (firm.demand - firm.output), firm.getGlobals().mu * firm.availableWorkers);
+//            System.out.println("previous production: " + firm.previousOutput);
+//            System.out.println(Math.min(firm.getGlobals().etta_plus * (firm.demand - firm.previousOutput), firm.getGlobals().mu * firm.unemployment));
+//            System.out.println("unemployment " + firm.unemployment);
+            firm.targetProduction = firm.previousOutput + Math.min(firm.getGlobals().etta_plus * (firm.demand - firm.previousOutput), firm.getGlobals().mu * firm.unemployment);
+//            System.out.println("target production " + firm.targetProduction);
         });
     }
 

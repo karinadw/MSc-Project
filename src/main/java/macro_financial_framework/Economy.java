@@ -4,6 +4,8 @@ package macro_financial_framework;
 
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
+import simudyne.core.annotations.Variable;
+import simudyne.core.graph.Link;
 
 import java.util.*;
 
@@ -20,6 +22,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     private double numerator = 0; // this is the sum of the product of the price and output for each firm
     private double denominator = 0; // this is the sum of the output of every firm
     public double averagePrice;
+    @Variable
     public int unemployment = 0;
 
 
@@ -191,6 +194,11 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 market.getMessagesOfType(Messages.Unemployed.class).forEach( msg ->
                         market.unemployment += 1);
             }
+
+            // send the current unemployment to the firms -> available workers
+            market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
+                unemploymentMessage.unemployment = market.unemployment;
+            });
         });
     }
 
@@ -204,4 +212,5 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class, market.averagePrice);
         });
     }
+
 }
