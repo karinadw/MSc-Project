@@ -290,6 +290,14 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+    public static Action<Firms> adjustPriceProduction() {
+        return Action.create(Firms.class, firm -> {
+
+            // first the firm needs to calculate what the new production goal will be according to the demand it received
+//           firm.targetProduction = firm.production + Math.min(firm.getGlobals().etta_plus * (firm.demand - firm.output), firm.getGlobals().mu * firm.availableWorkers);
+        });
+    }
+
 //    public static Action<Firms> AdjustVariable() {
 //        return Action.create(Firms.class, firm -> {
 //            // if the firm is productive, then re-calculate strategy

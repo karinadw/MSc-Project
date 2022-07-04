@@ -86,7 +86,7 @@ public class Messages {
     }
 
     public static class AveragePrice extends Message.Double {}
-
+    public static class Unemployed extends Message.Empty{}
 
 }
 

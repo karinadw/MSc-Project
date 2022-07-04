@@ -183,6 +183,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 )
         );
 
+        // after each hiring round, unemployment is calculated
+        run(Households.SendUnemployment(), Economy.calculateUnemployment());
+
         run(Households.sendProductivity(), Firms.CalculateFirmProductivity());
 
         run(Firms.FirmsProduce());
@@ -216,6 +219,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         // annually firms fire workers and workers update their availabilities
         if (getContext().getTick() % 12 == 0) {
             run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
+            run(Households.UnemployedWorkerCanApply());
         }
 
     }

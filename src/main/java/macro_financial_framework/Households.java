@@ -1,5 +1,6 @@
 package macro_financial_framework;
 
+import org.apache.hadoop.fs.Stat;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -160,6 +161,22 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                 worker.removeLinksTo(worker.getMessageOfType(Messages.Fired.class).getSender());
                 worker.status = Status.WORKER_UNEMPLOYED;
             }
+        });
+    }
+
+    public static Action<Households> UnemployedWorkerCanApply() {
+        return Action.create(Households.class, worker -> {
+            if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
+                worker.status = Status.WORKER_UNEMPLOYED;
+            }
+        });
+    }
+
+    public static Action<Households> SendUnemployment() {
+        return Action.create(Households.class, worker -> {
+           if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
+               worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class);
+           }
         });
     }
 

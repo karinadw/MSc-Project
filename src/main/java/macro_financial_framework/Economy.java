@@ -20,6 +20,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     private double numerator = 0; // this is the sum of the product of the price and output for each firm
     private double denominator = 0; // this is the sum of the output of every firm
     public double averagePrice;
+    public int unemployment = 0;
 
 
 
@@ -183,6 +184,15 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 //            });
 //        });
 //    }
+
+    public static Action<Economy> calculateUnemployment() {
+        return Action.create(Economy.class, market -> {
+            if(market.hasMessageOfType(Messages.Unemployed.class)){
+                market.getMessagesOfType(Messages.Unemployed.class).forEach( msg ->
+                        market.unemployment += 1);
+            }
+        });
+    }
 
     public static Action<Economy> CalculateAndSendAveragePrice() {
         return Action.create(Economy.class, market -> {
