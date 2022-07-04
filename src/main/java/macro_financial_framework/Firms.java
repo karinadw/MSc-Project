@@ -84,7 +84,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> SetPriceOfGoods() {
         return Action.create(Firms.class, firm -> {
-            double price = firm.getPrng().uniform(10.00, 10000.00).sample();
+            //TODO: check how to make logical assumptions about pricing
+            double price = firm.getPrng().uniform(10.00, 1000.00).sample();
             firm.priceOfGoods = price;
         });
     }
@@ -137,8 +138,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.hasMessageOfType(Messages.Productivity.class)) {
                 firm.getMessagesOfType(Messages.Productivity.class).forEach(msg -> {
                     firm.productivity += msg.productivity;
-                    firm.productivity /= firm.workers;
                 });
+                firm.productivity /= firm.workers;
 
                 // if the firm doesn't have workers, it's productivity is set to 0
             } else {
@@ -183,6 +184,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                 firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(purchaseMessage -> {
                     firm.demand += purchaseMessage.demand;
                     firm.stock -= purchaseMessage.bought;
+                    // cash received from the goods sold -> without subtracting costs of production and payment to workers/investors
+                    firm.earnings += firm.priceOfGoods;
                 });
             }
 

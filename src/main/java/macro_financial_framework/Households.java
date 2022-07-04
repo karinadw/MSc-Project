@@ -9,6 +9,7 @@ import java.util.HashMap;
 public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public int sector_skills;
+    public boolean rich;
     @Variable
     public double accumulatedSalary;
     public double savings; // their initial wealth
@@ -89,17 +90,6 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-//    public static Action<Households> sendDemand() {
-//        return Action.create(Households.class, worker -> {
-//            worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.HouseholdDemand.class, (m, l) -> {
-//                //TODO: savings is set to 0 currently -> change this. I am not too sure what the savings would be
-//                m.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth); // I can set the saving to a certain value initially -> shouldn't be uniform
-//                worker.consumptionBudget = worker.getGlobals().c * (worker.savings + worker.wealth);
-//
-//                m.sectorOfGoods = worker.getPrng().getNextInt(worker.getGlobals().nbSectors - 1); // random sector to consume from
-//            });
-//        });
-//    }
 
     public static Action<Households> sendDemand() {
         return Action.create(Households.class, worker -> {
@@ -111,14 +101,6 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-//    public static Action<Households> buyGoods() {
-//        return Action.create(Households.class, worker -> {
-//           if(worker.hasMessageOfType(Messages.PurchaseCompleted.class)){
-//               worker.wealth -= worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
-//               worker.savings = worker.consumptionBudget - worker.getMessageOfType(Messages.PurchaseCompleted.class).spent;
-//           }
-//        });
-//    }
 
     public static Action<Households> updateFromPurchase() {
         return Action.create(Households.class, household -> {
@@ -133,6 +115,28 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
             }
         });
     }
+
+    public static Action<Households> updateConsumptionBudget() {
+        //TODO: update this method for any number of goods
+        //update the consumption budget for each good after spending and receiving an income
+        return Action.create(Households.class, household -> {
+            if (!household.rich) {
+                // if the household is of common wealth it will only purchase competitive goods, as of now these are 2
+                double toSpend = household.consumptionBudget / 2;
+                household.budget.clear();
+                for (int i = 0; i < 2; i++) {
+                    household.budget.put(i, toSpend);
+                }
+            } else {
+                double toSpend = household.consumptionBudget / 3;
+                household.budget.clear();
+                for (int i = 0; i <= 2; i++) {
+                    household.budget.put(i, toSpend);
+                }
+            }
+        });
+    }
+
 
     public static Action<Households> getDividends() {
         return Action.create(Households.class, investor -> {

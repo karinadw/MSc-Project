@@ -69,8 +69,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             goodsVariable.householdsDemandingGoods = new ArrayList<>();
             goodsVariable.firmsSupplyingGoods = new ArrayList<>();
             goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
-            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
+//            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
+            System.out.printf("ID:" + goodsVariable.getID());
             if (i == 2){
                 goodsVariable.competitive = false; // goods only purchased by very wealthy individuals
             } else {
@@ -92,9 +93,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             household.accumulatedSalary = 0;
             // skewed distribution of wealth
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
+            //TODO: update this to work for more than 3 goods
             household.budget = new HashMap<Integer, Double>();
-            if (householdNumber < getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers)){
+            if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))){
                 // common individuals
+                household.rich = true;
                 household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
                 double moneyToSpend = 0.025 * household.savings;
                 for(int j = 0; j < 2; j++){
@@ -102,6 +105,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 }
             } else {
                 // wealthy individuals
+                household.rich = false;
                 household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
 
                 double moneyToSpend = 0.025 * household.savings;
@@ -110,8 +114,6 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                     household.budget.put(j, moneyToSpend / 3);
                 }
             }
-
-            household.productivity = household.getPrng().getNextInt(10);
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
@@ -197,8 +199,10 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Firms.receiveDemand(),
                         Households.updateFromPurchase()
                 )
-
         );
+
+        //after households purchase, the update their consumption budget for each goog
+        run(Households.updateConsumptionBudget());
 
         //firms pay out dividends from profits to investors
         run(Firms.payInvestors(), Households.getDividends());

@@ -83,7 +83,7 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
                             goodMarket.send(Messages.HouseholdWantsToPurchase.class, m -> {
                                 m.demand = quantityDemanded;
                                 m.bought = quantityDemanded;
-                            });
+                            }).to(household.ID);
 
                             // sends a message to the household of how much its spent
                             goodMarket.send(Messages.PurchaseCompleted.class, spentMessage -> {
@@ -103,11 +103,9 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
                         // when there are no more firms to purchase from
                         break;
                     }
-
                 }
             });
         });
     }
-
 }
 
