@@ -1,6 +1,5 @@
 package macro_financial_framework;
 
-import org.apache.hadoop.fs.Stat;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -63,9 +62,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                     if (worker.hasMessageOfType(Messages.Hired.class)) {
                         long firmID = worker.getMessageOfType(Messages.Hired.class).firmID;
                         worker.addLink(firmID, Links.WorkerToFirmLink.class);
-                        worker.send(Messages.Productivity.class, m -> {
-                            m.productivity = worker.productivity;
-                        }).to(firmID); //sends productivity to the firm its working for
+//                        worker.send(Messages.Productivity.class, m -> {
+//                            m.productivity = worker.productivity;
+//                        }).to(firmID); //sends productivity to the firm its working for
                         worker.status = Status.WORKER_EMPLOYED;
                     }
 
@@ -147,9 +146,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Households> AnnualCheck() {
+    public static Action<Households> JobCheck() {
         return Action.create(Households.class, worker -> {
-            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.AnnualCheck.class, (m, l) -> {
+            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.JobCheck.class, (m, l) -> {
                 m.productivity = worker.productivity;
             });
         });
@@ -175,7 +174,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> SendUnemployment() {
         return Action.create(Households.class, worker -> {
            if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
-               worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class);
+               worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class, (unemploymentMessage, linkToEconomy) -> {
+                   unemploymentMessage.sector = worker.sector_skills;
+               });
            }
         });
     }

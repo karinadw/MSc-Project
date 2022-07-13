@@ -21,7 +21,9 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
             // storing the supply for this good
             if (goodMarket.hasMessageOfType(Messages.FirmSupply.class)) {
                 goodMarket.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
-                    goodMarket.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.output, firmSupply.price));
+                    if (firmSupply.output > 0) {
+                        goodMarket.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.output, firmSupply.price));
+                    }
                 });
             }
 
@@ -32,6 +34,7 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
                 });
             }
 
+            //TODO: sort this out -> it is sorting the list from low to high -> there are more that are wrong
             // households with the highest consumption budget will have higher priority
             goodMarket.householdsDemandingGoods.sort(Comparator.comparing(household -> household.consumptionBudget));
 
@@ -39,15 +42,17 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
             // iterate over all the households, starting from the ones with most demand and match them to a firm that has supply and the cheapest price
             goodMarket.householdsDemandingGoods.forEach(household -> {
 
-                // sorts the price of the goods from highest to lowest
-                goodMarket.firmsSupplyingGoods.sort(Comparator.comparing(firm -> firm.price));
 
                 double demandFromHousehold = household.consumptionBudget;
 
                 while (demandFromHousehold > 0){
 
+                    // sorts the price of the goods from highest to lowest
+                    goodMarket.firmsSupplyingGoods.sort(Comparator.comparing(firm -> firm.price));
+
                     // gets the last firm in the list, i.e. the one with the cheapest price
-                    Optional<FirmSupplyInformation> firmToPurchaseFrom = goodMarket.firmsSupplyingGoods.stream().reduce((first, second) -> second);
+                    Optional<FirmSupplyInformation> firmToPurchaseFrom = goodMarket.firmsSupplyingGoods.stream().findFirst();
+//                    Optional<FirmSupplyInformation> firmToPurchaseFrom = goodMarket.firmsSupplyingGoods.stream().reduce((first, second) -> second);
 
                     if (firmToPurchaseFrom.isPresent()){
                         double priceOfGood = firmToPurchaseFrom.get().price;
@@ -69,14 +74,14 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
 
                             // sends a message to the household of how much its spent
                             goodMarket.send(Messages.PurchaseCompleted.class, spentMessage -> {
-                                spentMessage.spent = quantityAvailable;
+                                spentMessage.spent = quantityAvailable * priceOfGood;
                             }).to(household.ID);
 
                             // update the consumption budget of the household
                             demandFromHousehold = demandFromHousehold - (quantityAvailable * priceOfGood);
 
                             // this firm no longer has any available goods -> it's removed from the list of firms
-                            goodMarket.firmsSupplyingGoods.remove(firmToPurchaseFrom);
+                            goodMarket.firmsSupplyingGoods.remove(firmToPurchaseFrom.get());
                         }
 
                         else if (quantityDemanded < quantityAvailable){
@@ -95,7 +100,7 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
 
                             // remove the firm and add it again with the updated quantity available
                             // TODO: find a better way of doing this
-                            goodMarket.firmsSupplyingGoods.remove(firmToPurchaseFrom);
+                            goodMarket.firmsSupplyingGoods.remove(firmToPurchaseFrom.get());
                             goodMarket.firmsSupplyingGoods.add(new FirmSupplyInformation(firmToPurchaseFrom.get().ID, firmToPurchaseFrom.get().output, firmToPurchaseFrom.get().price));
 
                         }

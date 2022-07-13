@@ -32,11 +32,23 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         //TODO: refactor this as I have named the productivity of a firm alpha
         public double alpha = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
 
-        // copied the number from Mark 0 model
-        @Input(name="ettaPlus")
+        // TODO: copied the number from Mark 0 model
+        @Input(name = "ettaPlus")
         public double etta_plus = 0.416d;
 
-        @Input(name="mu")
+        // TODO: copied the number from Mark 0 model
+        @Input(name = "ettaMinus")
+        public double etta_minus = 0.12d;
+
+        // TODO: copied the number from Mark 0 model
+        @Input(name = "gammaP")
+        public double gamma_p = 0.05d;
+
+        // TODO: copied the number from Mark 0 model
+        @Input(name="Theta")
+        public double Theta = 1.5d;
+
+        @Input(name = "mu")
         public double mu = 1.0;
 
         @Input
@@ -44,12 +56,16 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         public HashMap<Integer, Long> goodExchangeIDs;
 
+        @Input(name="f")
+        public double f = 1.0d;
+
+        @Input(name="phi")
+        public double phi = 0.1d;
+
     }
 
     @Override
     public void init() {
-
-        createLongAccumulator("firm_vacancies");
 
         registerAgentTypes(Firms.class,
                 Households.class,
@@ -63,10 +79,13 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 Links.FirmToInvestorLink.class,
                 Links.InvestorToFirmLink.class,
                 Links.FirmToBuyerLink.class,
-                Links.EconomyToFirm.class);
+                Links.EconomyToFirm.class,
+                Links.GoodsMarketToEconomy.class);
     }
+
     int i = 0;
     int householdNumber = 0;
+
     @Override
     public void setup() {
 
@@ -79,7 +98,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 //            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
             System.out.printf("ID:" + goodsVariable.getID());
-            if (i == 2){
+            if (i == 2) {
                 goodsVariable.competitive = false; // goods only purchased by very wealthy individuals
             } else {
                 goodsVariable.competitive = true; // this is common goods accesible to everyone, more common goods
@@ -102,12 +121,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
             //TODO: update this to work for more than 3 goods
             household.budget = new HashMap<Integer, Double>();
-            if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))){
+            if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = true;
                 household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
                 double moneyToSpend = 0.025 * household.savings;
-                for(int j = 0; j < 2; j++){
+                for (int j = 0; j < 2; j++) {
                     household.budget.put(j, moneyToSpend / 2);
                 }
             } else {
@@ -117,7 +136,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
                 double moneyToSpend = 0.025 * household.savings;
                 // wealthy individuals spend on luxury goods as well
-                for(int j = 0; j <= 2; j++){
+                for (int j = 0; j <= 2; j++) {
                     household.budget.put(j, moneyToSpend / 3);
                 }
             }
@@ -132,11 +151,16 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 //            market.householdsDemandingGoods = new ArrayList<>();
 //            market.firmsSupplyingGoods = new ArrayList<>();
             market.priceOfGoods = new HashMap<Double, Double>();
+            market.healthyFirmAccountMap = new HashMap<Long, HealthyFirmAccount>();
+            market.indebtedFirmsMap = new HashMap<>();
+            market.bankruptFirmsArray = new ArrayList<>();
+            market.bailedOutFirmsMap = new HashMap<>();
         });
 
         HouseholdGroup.fullyConnected(Economy, Links.HouseholdToEconomy.class);
         FirmGroup.fullyConnected(Economy, Links.FirmToEconomyLink.class);
         Economy.fullyConnected(FirmGroup, Links.EconomyToFirm.class);
+        Economy.fullyConnected(goodsMarket, Links.GoodsMarketToEconomy.class);
 
         // TODO: check why am I getting an error trying to run the line below
 //        GoodsMarket.fullyConnected(Economy, Links.GoodsMarketToEconomy.class);
@@ -149,14 +173,22 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public void step() {
         super.step();
 
-        // set everything up in the first tick
+        //TODO: check if the flow of the steps makes sense, i.e. where I have tick == 0 and stuff
+
+        // Initial settings that do not need to get repeated throughout
         if (getContext().getTick() == 0) {
 
             // firms set their vacancies according to their size
             run(Firms.SetVacancies());
 
-            //the firm sets the prices of the goods it produces and the economy stores the firm ID and price of good produced
+            //the firm sets the prices of the goods it produces
             run(Firms.SetPriceOfGoods());
+
+            // set sector specific wages
+            run(Firms.sendVacancies(), Economy.SetFirmProperties(), Firms.SetSectorSpecifics());
+
+//             set sector specific goods
+//            run(Firms.sendVacancies(), Economy.setFirmGood(), Firms.SetSectorSpecificGood());
 
             // dividing households into investors and workers
             run(
@@ -174,28 +206,43 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         // workers apply for jobs and firms that have vacancies hire
         // firms set their wage according to the sector they're in
         // firms decide what good they produce depending on the sector they're in
+        // TODO: check the flow of actions here, doesn't make sense as of now
         run(
                 Split.create(
+                        // if the worker is unemployed, the worker applies for a job. Received by the economy
                         Households.applyForJob(),
-                        Firms.sendVacancies()),
+                        // if the firm is hiring, vacancies are sent to the economy
+                        Firms.sendVacancies()
+                ),
+                        Economy.MatchFirmsAndWorkers(),
                 Split.create(
-                        Economy.SetFirmWages(),
-                        Economy.setFirmGood(),
-                        Economy.MatchFirmsAndWorkers()),
-                Split.create(
-                        Firms.SetSectorSpecificWages(),
-                        Firms.SetSectorSpecificGood(),
+                        // if the worker has been employed it updates its status
                         Households.updateAvailability(),
                         Firms.updateVacancies()
                 )
         );
 
-        // after each hiring round, unemployment is calculated
-        run(Households.SendUnemployment(), Economy.calculateUnemployment());
+//        // after each hiring round, unemployment is calculated
+//        run(Households.SendUnemployment(), Economy.calculateUnemployment());
 
+        // the productivity of the firm is dependant on the productivity of the workers
         run(Households.sendProductivity(), Firms.CalculateFirmProductivity());
 
+        // Firms produce their good according to the productivity of the firm, the number of workers and the size of the firm
         run(Firms.FirmsProduce());
+
+        // calculates the average price of products and sends it to the firms
+        // this is needed for the firm to update its strategy
+        // change in average price is used to calculate inflation
+        // TODO: check if right -> has not been tested because simulation does not run
+        run(Firms.sendPrice(), Economy.GetPrices());
+        run(Economy.CalculateAndSendAveragePrice(), Firms.GetAveragePrice());
+
+        // calculates inflation
+        // not done in the first tick as there is no information in product pricing yet
+        if (getContext().getTick() > 0) {
+            run(Economy.CalculateInflation());
+        }
 
         // workers get paid the wage offered by their firm and investors get paid dividends
         run(Firms.payWorkers(), Households.receiveIncome());
@@ -211,28 +258,43 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 )
         );
 
+
+        //TODO: check if all the functions below are right
+        run(
+                Split.create(
+                        Firms.sendInfoToGetAvailableWorkers(),
+                        Households.SendUnemployment()
+                ),
+                Economy.calculateUnemploymentAndAavailableWorkers(),
+                Firms.receiveAvailableWorkers()
+        );
+
+        // after households purchase, the update their consumption budget for each goog
+        run(Households.updateConsumptionBudget());
+
+
+        // Firm accounting
+        run(Firms.Accounting());
+
+        //firms pay out dividends to investors if earnings and profits are positive
+        run(Firms.payInvestors(), Households.getDividends());
+
+
         //update the target production to meet the demand
         run(Firms.adjustPriceProduction());
 
-        //after households purchase, the update their consumption budget for each goog
-        run(Households.updateConsumptionBudget());
+        // updates firms' vacancies according to the new target production
+        run(Firms.UpdateVacancies());
 
-        //firms pay out dividends from profits to investors
-        run(Firms.payInvestors(), Households.getDividends());
+        // with the updated vacancies, the firms hire if they don't need anymore workers
+        // workers that had already applied can now apply in the next hiring round
+        run(Households.JobCheck(), Firms.FireWorkers(), Households.CheckIfFired());
+        run(Households.UnemployedWorkerCanApply());
 
-        run(Firms.calculateProfits());
-
-        run(Firms.sendPrice(), Economy.GetPrices());
-        run(Economy.CalculateAndSendAveragePrice());
-
-        // assuming 12 ticks represent a year
-        // annually firms fire workers and workers update their availabilities
-        if (getContext().getTick() % 12 == 0) {
-            run(Households.AnnualCheck(), Firms.FireWorkers(), Households.CheckIfFired());
-            run(Households.UnemployedWorkerCanApply());
-        }
-
+        // firms can change sizes depending on the employees it has
+//        run(Firms.UpdateFirmType());
     }
 
 }
+
 

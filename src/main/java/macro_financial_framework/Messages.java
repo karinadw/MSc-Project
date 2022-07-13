@@ -11,8 +11,9 @@ public class Messages {
         public long investorID;
     }
 
-    public static class FirmWage extends Message {
+    public static class FirmProperties extends Message {
         public double wage;
+        public int good;
     }
 
     public static class FirmGood extends Message {
@@ -50,7 +51,7 @@ public class Messages {
         public double wage;
     }
 
-    public static class AnnualCheck extends Message{
+    public static class JobCheck extends Message{
         public double productivity;
     }
 
@@ -85,11 +86,41 @@ public class Messages {
         public double dividend;
     }
 
-    public static class AveragePrice extends Message.Double {}
-    public static class Unemployed extends Message.Empty{}
+    public static class AveragePrice extends Message {
+        public double averagePrice;
+    }
+    public static class Unemployed extends Message {
+        public int sector;
+    }
+    public static class FirmGetAvailableWorkers extends Message {
+        public int sector;
+    }
+
+    public static class AvailableWorkersInYourSector extends Message {
+        public int workers;
+    }
     public static class CurrentUnemployment extends Message {
         public int unemployment;
     }
+
+    public static class HealthyFirmAccountMessage extends Message {
+        public HealthyFirmAccount healthyFirmAccount;
+    }
+
+    public static class BailoutRequestMessage extends Message {
+        public double debt;
+    }
+
+    public static class BailoutPackageMessage extends Message {
+        public double price;
+        public double wage;
+    }
+
+    public static class DepositsMessage extends Message {
+        public double cash;
+    }
+
+    public static class BankruptcyMessage extends Message.Empty {}
 
 }
 
