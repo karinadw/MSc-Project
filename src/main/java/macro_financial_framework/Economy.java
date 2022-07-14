@@ -68,25 +68,44 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             // creating a hashmap tp store all the sectors and their corresponding wage
             HashMap<Integer, Double> sectorWages = new HashMap<Integer, Double>();
             HashMap<Integer, Integer> sectorGood = new HashMap<Integer, Integer>();
+            HashMap<Integer, Integer> sectorGoodToPurchase = new HashMap<Integer, Integer>();
             int numberOfSectors = market.getGlobals().nbSectors; // not adding -1 and instead keeping i<numberOfSector instead of <=
             int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
             for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
-
                 // TODO: check if the numbers for the wages makes sense
                 double wage = market.getPrng().uniform(2000.00, 4000.00).sample();
                 sectorWages.put(sector, wage);
                 int good = market.getPrng().getNextInt(numberOfGoods);
                 sectorGood.put(sector, good);
+                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
+                // I've just put greater than 0 as a placeholder
+                // the loop will keep going if the good to purchase in that sector and the one being produced are the same
+                // when they are not there is a break statement
+                while (goodNeededForProduction > 0){
+                    // if the good of that sector and the good needed for production are the same then recalculate
+                    if (goodNeededForProduction == good){
+                        goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
+                    } else if (goodNeededForProduction != good){
+                        sectorGoodToPurchase.put(sector, goodNeededForProduction);
+                        break;
+                    }
+                }
+            }
+
+            for (int i = 0; i < numberOfSectors; i++){
+                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
             }
 
             market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
                 int firmSector = m.sector;
                 double firmWage = sectorWages.get(firmSector);
                 int goodTraded = sectorGood.get(firmSector);
+                int goodToPurchase = sectorGoodToPurchase.get(firmSector);
                 market.send(Messages.FirmProperties.class, msg -> {
                     msg.wage = firmWage;
                     msg.good = goodTraded;
+                    msg.goodToPurchase = goodToPurchase;
                 }).to(m.getSender());
             });
         });

@@ -120,9 +120,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             household.accumulatedSalary = 0;
             // skewed distribution of wealth
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
-            //TODO: update this to work for more than 3 goods
             household.budget = new HashMap<Integer, Double>();
-
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
@@ -146,6 +144,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             }
             householdNumber++;
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
+
             // TODO: check if these numbers make sense
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });

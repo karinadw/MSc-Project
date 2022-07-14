@@ -42,6 +42,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double averagePrice;
     public boolean isHiring = true;
     public int workersToBeFired = 0;
+    public int goodNeededForProduction;
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
@@ -63,7 +64,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.hasMessageOfType(Messages.FirmProperties.class)) {
                 firm.getMessagesOfType(Messages.FirmProperties.class).forEach(msg -> {
                     firm.good = msg.good;
-                    // TODO: check if this makes sense
+                    firm.goodNeededForProduction = msg.goodToPurchase;
+                    //TODO: check if this makes sense
                     if (firm.sizeOfCompany == 0) {
                         firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
                     } else if (firm.sizeOfCompany == 1) {
@@ -78,7 +80,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> SetPriceOfGoods() {
         return Action.create(Firms.class, firm -> {
-            // TODO: check how to make logical assumptions about pricing
+            //TODO: check how to make logical assumptions about pricing
+            //TODO: add the possibility of having another good
             double price = firm.getPrng().uniform(10.00, 1000.00).sample();
             firm.priceOfGoods = price;
         });

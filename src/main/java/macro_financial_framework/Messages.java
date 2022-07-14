@@ -14,6 +14,7 @@ public class Messages {
     public static class FirmProperties extends Message {
         public double wage;
         public int good;
+        public int goodToPurchase;
     }
 
     public static class FirmGood extends Message {
