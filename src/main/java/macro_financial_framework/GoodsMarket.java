@@ -14,7 +14,9 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
     public boolean competitive;
 
     public List<FirmSupplyInformation> firmsSupplyingGoods;
+    public List<FirmSupplyInformation> firmsSupplyingIntermediateGoods;
     public List<HouseholdDemandInformation> householdsDemandingGoods;
+    public List<HouseholdDemandInformation> firmsDemandingIntermediateGoods;
 
     public static Action<GoodsMarket> matchSupplyAndDemand() {
         return Action.create(GoodsMarket.class, goodMarket -> {
@@ -112,6 +114,12 @@ public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
                     }
                 }
             });
+        });
+    }
+
+    public static Action<GoodsMarket> MatchSupplyAndDemandIntermediateGoods() {
+        return Action.create(GoodsMarket.class, intermediateGoodsMarket -> {
+
         });
     }
 }

@@ -82,7 +82,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 // I've just put greater than 0 as a placeholder
                 // the loop will keep going if the good to purchase in that sector and the one being produced are the same
                 // when they are not there is a break statement
-                while (goodNeededForProduction > 0){
+                while (goodNeededForProduction >= 0){
                     // if the good of that sector and the good needed for production are the same then recalculate
                     if (goodNeededForProduction == good){
                         goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
@@ -91,10 +91,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                         break;
                     }
                 }
-            }
-
-            for (int i = 0; i < numberOfSectors; i++){
-                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
             }
 
             market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {

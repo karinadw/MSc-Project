@@ -183,6 +183,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             //the firm sets the prices of the goods it produces
             run(Firms.SetPriceOfGoods());
 
+            // setting all firms with an initial stock of intermediate goods so that every firm can produce
+            run(Firms.SetInitialStockOfIntermediateGoods());
+
             // set sector specific wages and sector specific pricing of goods
             run(Firms.sendVacancies(), Economy.SetFirmProperties(), Firms.SetSectorSpecifics());
 

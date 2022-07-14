@@ -123,5 +123,14 @@ public class Messages {
 
     public static class BankruptcyMessage extends Message.Empty {}
 
+    public static class PurchaseIntermediateGood extends Message {
+        public int demand;
+    }
+
+    public static class StockOfIntermediateGood extends Message {
+        public long stock;
+        public double price;
+    }
+
 }
 

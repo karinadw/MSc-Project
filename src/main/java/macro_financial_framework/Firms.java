@@ -42,20 +42,32 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double averagePrice;
     public boolean isHiring = true;
     public int workersToBeFired = 0;
-    public int goodNeededForProduction;
+    public int intermediateGood; // the intermediate good it needs, i.e. good 0
+    public int stockOfIntermediateGood; // how much of that good it has
+    public double intermediateGoodConstant;
+    public long intermediateGoodQuantityProduced;
+    public double priceOfIntermediateGood;
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
             // set vacancies according to firm size
-            // TODO: check if logic makes sense
+            // TODO: check if logic makes sense -> check the numbers
             // potential resources: https://www.statista.com/statistics/676671/employees-by-business-size-uk/
             if (firm.sizeOfCompany == 0) {
-                firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
+                firm.vacancies = (int) firm.getPrng().uniform(1, 50).sample();
             } else if (firm.sizeOfCompany == 1) {
-                firm.vacancies = (int) firm.getPrng().uniform(10, 100).sample();
+                firm.vacancies = (int) firm.getPrng().uniform(50, 200).sample();
             } else {
-                firm.vacancies = (int) firm.getPrng().uniform(100, 1000).sample();
+                firm.vacancies = (int) firm.getPrng().uniform(200, 5000).sample();
             }
+        });
+    }
+
+    public static Action<Firms> SetInitialStockOfIntermediateGoods(){
+        return Action.create(Firms.class, firm -> {
+            // I am assuming a one on one relationship, for one unit of good, one intermediate good is needed
+            // Ideally, a firm will have 100% productivity so target output would be the initial vacancies * 100% productivity = initial stock of intermediate goods
+            firm.stockOfIntermediateGood = firm.vacancies;
         });
     }
 
@@ -64,7 +76,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.hasMessageOfType(Messages.FirmProperties.class)) {
                 firm.getMessagesOfType(Messages.FirmProperties.class).forEach(msg -> {
                     firm.good = msg.good;
-                    firm.goodNeededForProduction = msg.goodToPurchase;
+                    firm.intermediateGood = msg.goodToPurchase;
                     //TODO: check if this makes sense
                     if (firm.sizeOfCompany == 0) {
                         firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
@@ -148,12 +160,55 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+
     public static Action<Firms> FirmsProduce() {
         return Action.create(Firms.class, firm -> {
             // depending on the size of the firm -> workers can produce more or less goods
             // this is assuming that larger companies have more facilities
             //TODO: check if this is a fair assumption
-            firm.stock = (long) Math.floor(firm.productivity * firm.workers);
+
+            // this means it has enough intermediate goods for production
+            if (firm.workers <= firm.stockOfIntermediateGood){
+                firm.intermediateGoodConstant = 1.00d;
+                firm.intermediateGood -= firm.workers;
+
+            // if the firm doesn't have any intermediate good it can't produce
+            } else if (firm.stockOfIntermediateGood == 0){
+                firm.intermediateGoodConstant = 0.00d;
+
+            // the workers a firm has is the maximum amount of goods it can produce
+            // to produce all of the goods it needs the same amount of workers as intermediate goods
+            } else if (firm.stockOfIntermediateGood < firm.workers){
+                firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
+                firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
+            }
+            firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant);
+            firm.intermediateGoodQuantityProduced = firm.stock;
+
+            //TODO: check if this is a valid assumption
+            firm.priceOfIntermediateGood = firm.priceOfGoods / 2;
+        });
+    }
+
+    public static Action<Firms> SendIntermediateGoodInfo(){
+        return Action.create(Firms.class, firm -> {
+            // sends the message of the good it is producing as intermediate good
+            firm.send(Messages.StockOfIntermediateGood.class, message -> {
+               message.price = firm.priceOfIntermediateGood;
+               message.stock = firm.intermediateGoodQuantityProduced;
+            }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
+        });
+    }
+
+    public static Action<Firms> PurchaseIntermediateGoods(){
+        return Action.create(Firms.class, firm -> {
+            // sends the message to the intermediate good it wants to purchase
+            // if the firm does not have enough intermediate goods to produce it's maximum output, it purchases
+            if (firm.stockOfIntermediateGood < firm.workers){
+                firm.send(Messages.PurchaseIntermediateGood.class, m -> {
+                   m.demand = firm.workers - firm.stockOfIntermediateGood;
+                }).to(firm.getGlobals().goodExchangeIDs.get(firm.intermediateGood));
+            }
         });
     }
 
