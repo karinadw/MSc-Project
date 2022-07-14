@@ -16,8 +16,6 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public int sizeOfCompany;
     @Variable
     public int sector;
-    //    @Variable
-//    public double deposits;
     @Variable
     public double profit = 0;
     @Variable
@@ -39,7 +37,6 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double previousOutput;
     public double targetProduction;
     public int good;
-    public int unemployment;
     public double deposits;
     public int availableWorkers;
     public double averagePrice;
@@ -49,7 +46,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
             // set vacancies according to firm size
-            //TODO: check if logic makes sense
+            // TODO: check if logic makes sense
+            // potential resources: https://www.statista.com/statistics/676671/employees-by-business-size-uk/
             if (firm.sizeOfCompany == 0) {
                 firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
             } else if (firm.sizeOfCompany == 1) {
@@ -65,6 +63,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.hasMessageOfType(Messages.FirmProperties.class)) {
                 firm.getMessagesOfType(Messages.FirmProperties.class).forEach(msg -> {
                     firm.good = msg.good;
+                    // TODO: check if this makes sense
                     if (firm.sizeOfCompany == 0) {
                         firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
                     } else if (firm.sizeOfCompany == 1) {
@@ -79,7 +78,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> SetPriceOfGoods() {
         return Action.create(Firms.class, firm -> {
-            //TODO: check how to make logical assumptions about pricing
+            // TODO: check how to make logical assumptions about pricing
             double price = firm.getPrng().uniform(10.00, 1000.00).sample();
             firm.priceOfGoods = price;
         });
@@ -139,7 +138,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                 });
                 firm.productivity /= firm.workers;
 
-                // if the firm doesn't have workers, it's productivity is set to 0
+            // if the firm doesn't have workers, it's productivity is set to 0
             } else {
                 firm.productivity = 0;
             }
@@ -152,10 +151,10 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             // this is assuming that larger companies have more facilities
             //TODO: check if this is a fair assumption
             firm.stock = (long) Math.floor(firm.productivity * firm.workers);
-
         });
     }
 
+    // TODO: sell the inventory first
     public static Action<Firms> sendSupply() {
         return Action.create(Firms.class, firm -> {
             firm.send(Messages.FirmSupply.class, m -> {
@@ -184,7 +183,6 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                 });
 
             }
-
             firm.inventory += firm.stock;
             firm.stock = 0;
         });
@@ -300,17 +298,33 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                         });
             }
 
-            if (!firm.isHiring) {
+            if (!firm.isHiring){
+                // if it wants to fire all the workers the firm sends a message to all its employees
+                // reducing computational complexity by doing it this way
+                if (firm.workersToBeFired == firm.workers){
+                    firm.getLinks(Links.FirmToWorkerLink.class).send(Messages.Fired.class);
+                }
+            } else {
                 int firedWorkers = 0;
                 while (firedWorkers < firm.workersToBeFired) {
-//                    System.out.println(workers.keySet().toArray()[0]);
                     double workerKey = (double) workers.keySet().toArray()[firedWorkers];
-//                    System.out.println(workers.get(key));
                     long workerID = workers.get(workerKey);
                     firm.send(Messages.Fired.class).to(workerID);
                     firedWorkers++;
                 }
             }
+        });
+    }
+
+    public static Action<Firms> UpdateFirmSize() {
+        return Action.create(Firms.class, firm -> {
+           if (firm.workers >= 10){
+               firm.sizeOfCompany = 0;
+           } else if (firm.workers > 10 && firm.workers <= 100){
+               firm.sizeOfCompany = 1;
+           } else {
+               firm.sizeOfCompany = 2;
+           }
         });
     }
 }

@@ -97,8 +97,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
 //            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
-            System.out.printf("ID:" + goodsVariable.getID());
-            if (i == 2) {
+
+            int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
+            if (i >= exclusiveGoods) {
                 goodsVariable.competitive = false; // goods only purchased by very wealthy individuals
             } else {
                 goodsVariable.competitive = true; // this is common goods accesible to everyone, more common goods
@@ -121,26 +122,31 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
             //TODO: update this to work for more than 3 goods
             household.budget = new HashMap<Integer, Double>();
+
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
                 // common individuals
-                household.rich = true;
+                household.rich = false;
                 household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
                 double moneyToSpend = 0.025 * household.savings;
-                for (int j = 0; j < 2; j++) {
-                    household.budget.put(j, moneyToSpend / 2);
+                int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
+                for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
+                    household.budget.put(j, moneyToSpend / (getGlobals().nbGoods) - exclusiveGoods);
                 }
             } else {
                 // wealthy individuals
-                household.rich = false;
+                household.rich = true;
                 household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
 
                 double moneyToSpend = 0.025 * household.savings;
                 // wealthy individuals spend on luxury goods as well
-                for (int j = 0; j <= 2; j++) {
-                    household.budget.put(j, moneyToSpend / 3);
+                // they spend on all goods
+                for (int j = 0; j < getGlobals().nbGoods; j++) {
+                    household.budget.put(j, moneyToSpend / getGlobals().nbGoods);
                 }
             }
+            householdNumber++;
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
+            // TODO: check if these numbers make sense
             household.productivity = household.getPrng().uniform(0.5, 1).sample();
         });
 
@@ -162,18 +168,12 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Economy.fullyConnected(FirmGroup, Links.EconomyToFirm.class);
         Economy.fullyConnected(goodsMarket, Links.GoodsMarketToEconomy.class);
 
-        // TODO: check why am I getting an error trying to run the line below
-//        GoodsMarket.fullyConnected(Economy, Links.GoodsMarketToEconomy.class);
-
-
         super.setup();
     }
 
     @Override
     public void step() {
         super.step();
-
-        //TODO: check if the flow of the steps makes sense, i.e. where I have tick == 0 and stuff
 
         // Initial settings that do not need to get repeated throughout
         if (getContext().getTick() == 0) {
@@ -184,11 +184,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             //the firm sets the prices of the goods it produces
             run(Firms.SetPriceOfGoods());
 
-            // set sector specific wages
+            // set sector specific wages and sector specific pricing of goods
             run(Firms.sendVacancies(), Economy.SetFirmProperties(), Firms.SetSectorSpecifics());
-
-//             set sector specific goods
-//            run(Firms.sendVacancies(), Economy.setFirmGood(), Firms.SetSectorSpecificGood());
 
             // dividing households into investors and workers
             run(
@@ -200,11 +197,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                             Firms.AssignFirmInvestor()
                     )
             );
-
         }
 
         // workers apply for jobs and firms that have vacancies hire
-        // firms set their wage according to the sector they're in
         // firms decide what good they produce depending on the sector they're in
         // TODO: check the flow of actions here, doesn't make sense as of now
         run(
@@ -234,7 +229,6 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         // calculates the average price of products and sends it to the firms
         // this is needed for the firm to update its strategy
         // change in average price is used to calculate inflation
-        // TODO: check if right -> has not been tested because simulation does not run
         run(Firms.sendPrice(), Economy.GetPrices());
         run(Economy.CalculateAndSendAveragePrice(), Firms.GetAveragePrice());
 
@@ -292,7 +286,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         run(Households.UnemployedWorkerCanApply());
 
         // firms can change sizes depending on the employees it has
-//        run(Firms.UpdateFirmType());
+        run(Firms.UpdateFirmSize());
     }
 
 }

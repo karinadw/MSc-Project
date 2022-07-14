@@ -61,6 +61,9 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Economy> SetFirmProperties() {
+        // sets the sector specific goods
+        // sets the sector specific wages
+        // sends these to the firms
         return Action.create(Economy.class, market -> {
             // creating a hashmap tp store all the sectors and their corresponding wage
             HashMap<Integer, Double> sectorWages = new HashMap<Integer, Double>();
@@ -69,6 +72,8 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
             for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
+
+                // TODO: check if the numbers for the wages makes sense
                 double wage = market.getPrng().uniform(2000.00, 4000.00).sample();
                 sectorWages.put(sector, wage);
                 int good = market.getPrng().getNextInt(numberOfGoods);
@@ -87,28 +92,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-//    public static Action<Economy> setFirmGood() {
-//        return Action.create(Economy.class, market -> {
-//            // creating a hashmap tp store all the sectors and their corresponding good traded
-//
-//            int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
-//            int numberOfSectors = market.getGlobals().nbSectors;
-//            for (int i = 0; i < numberOfSectors; i++) {
-//                int sector = i;
-//                int good = market.getPrng().getNextInt(numberOfGoods);
-//                sectorGood.put(sector, good);
-//            }
-//
-//            market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
-//                int firmSector = m.sector;
-//                int goodTraded = sectorGood.get(firmSector);
-//                market.send(Messages.FirmGood.class, msg -> {
-//                    msg.good = goodTraded;
-//                }).to(m.getSender());
-//            });
-//        });
-//    }
-
     public static Action<Economy> GetPrices() {
         return Action.create(Economy.class, market -> {
             market.getMessagesOfType(Messages.FirmsPrice.class).forEach(priceMessage -> {
@@ -123,6 +106,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 market.numerator += (price * output);
                 market.denominator += output;
             });
+
             // stores the previous average price to calculate inflation
             market.previousAveragePrice = market.averagePrice;
 
