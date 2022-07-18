@@ -24,6 +24,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
     private double denominator = 0; // this is the sum of the output of every firm
     public double averagePrice;
     public double previousAveragePrice;
+    @Variable
     public double inflation;
     @Variable
     public int unemployment = 0;
@@ -76,21 +77,29 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 // TODO: check if the numbers for the wages makes sense
                 double wage = market.getPrng().uniform(2000.00, 4000.00).sample();
                 sectorWages.put(sector, wage);
-                int good = market.getPrng().getNextInt(numberOfGoods);
+                // int good = market.getPrng().getNextInt(numberOfGoods);
+                int good = sector;
+                // TODO: check if assumption below is fine
+                // Setting one good per sector, obvs this is a complex way of doing it but it is left like this in case the assumption is not valid
                 sectorGood.put(sector, good);
-                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
-                // I've just put greater than 0 as a placeholder
-                // the loop will keep going if the good to purchase in that sector and the one being produced are the same
-                // when they are not there is a break statement
-                while (goodNeededForProduction >= 0){
-                    // if the good of that sector and the good needed for production are the same then recalculate
-                    if (goodNeededForProduction == good){
-                        goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
-                    } else if (goodNeededForProduction != good){
-                        sectorGoodToPurchase.put(sector, goodNeededForProduction);
-                        break;
-                    }
-                }
+
+//                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
+//                // I've just put greater than 0 as a placeholder
+//                // the loop will keep going if the good to purchase in that sector and the one being produced are the same
+//                // when they are not there is a break statement
+//                while (goodNeededForProduction >= 0){
+//                    // if the good of that sector and the good needed for production are the same then recalculate
+//                    if (goodNeededForProduction == good){
+//                        goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
+//                    } else if (goodNeededForProduction != good){
+//                        sectorGoodToPurchase.put(sector, goodNeededForProduction);
+//                        break;
+//                    }
+//                }
+
+                // easier way to do the above -> this was all firms has a connection with another firm for intermediate goods
+                int goodNeededForProduction = (i+1) % numberOfGoods;
+                sectorGoodToPurchase.put(sector, goodNeededForProduction);
             }
 
             market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
@@ -124,6 +133,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
             // stores the previous average price to calculate inflation
             market.previousAveragePrice = market.averagePrice;
+//            System.out.println("average price " + market.averagePrice + " previous average price " + market.previousAveragePrice);
 
             // new average price
             market.averagePrice = market.numerator / market.denominator;
@@ -143,19 +153,24 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Economy> MatchFirmsAndWorkers() {
         return Action.create(Economy.class, market -> {
+
+            market.availableWorkers.clear();
             market.getMessagesOfType(Messages.JobApplication.class).forEach(msg -> {
                 market.availableWorkers.add(new WorkerID(msg.getSender(), msg.sector, msg.productivity));
             });
+
             market.firmsHiring.clear();  // to account for new vacancies in case of firing
             market.getMessagesOfType(Messages.FirmInformation.class).forEach(mes -> {
                 market.firmsHiring.add(new FirmID(mes.getSender(), mes.sector, mes.vacancies));
             });
+
             market.firmsHiring.forEach(firm -> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
+
                 for (int x = 0; x < vacancies; x++) {
-                    //TODO: choose worker with preferences of higher productivity
                     market.availableWorkers.sort(Comparator.comparing(worker -> worker.productivity));
+                    Collections.reverse(market.availableWorkers);
                     Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();
                     if (potentialWorkerGoodCandidate.isPresent()) {
 
@@ -174,8 +189,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                         vacancies--;
 
                     } else {
-                        //TODO: CHECK LOGIC TO SEE IF WE NEED TO UPDATE VACANCIES
-//                        firm.vacancies = vacancies;
                         break;
                     }
                 }

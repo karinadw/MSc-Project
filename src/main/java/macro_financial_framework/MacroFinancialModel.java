@@ -23,7 +23,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public long nbWorkers = 100;
 
         @Input
-        public int nbSectors = 10;
+        public int nbSectors = 21;
 
         @Input
         public double c = 0.025d; // this is for calculating the consumption budget
@@ -52,7 +52,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public double mu = 1.0;
 
         @Input
-        public int nbGoods = 3;
+        public int nbGoods = 21;
 
         public HashMap<Integer, Long> goodExchangeIDs;
 
@@ -94,6 +94,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         Group<GoodsMarket> goodsMarket = generateGroup(GoodsMarket.class, getGlobals().nbGoods, goodsVariable -> {
             goodsVariable.householdsDemandingGoods = new ArrayList<>();
             goodsVariable.firmsSupplyingGoods = new ArrayList<>();
+            goodsVariable.firmsSupplyingIntermediateGoods = new ArrayList<>();
+            goodsVariable.firmsDemandingIntermediateGoods = new ArrayList<>();
             goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
 //            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
@@ -109,14 +111,14 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
-            firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors - 1);
+            firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors); // get next int creates a random variable until limit - 1, so with this range we get values from 0 to 20
             firm.firingRate = 0.05;
-            firm.sizeOfCompany = firm.getPrng().getNextInt(2); //start-up: 0, medium-sized: 1, large company: 2
+            firm.sizeOfCompany = firm.getPrng().getNextInt(3); //start-up: 0, medium-sized: 1, large company: 2
         });
 
 
         Group<Households> HouseholdGroup = generateGroup(Households.class, getGlobals().nbWorkers, household -> {
-            household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors - 1);  // random sector skills applied to the workers
+            household.sector_skills = household.getPrng().getNextInt(getGlobals().nbSectors);  // random sector skills applied to the workers
             household.accumulatedSalary = 0;
             // skewed distribution of wealth
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
@@ -124,11 +126,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
-                household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
+                household.savings = household.getPrng().uniform(10000.00, 20000.00).sample();
                 double moneyToSpend = 0.025 * household.savings;
                 int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
                 for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
-                    household.budget.put(j, moneyToSpend / (getGlobals().nbGoods) - exclusiveGoods);
+                    household.budget.put(j, moneyToSpend / ((getGlobals().nbGoods) - exclusiveGoods));
                 }
             } else {
                 // wealthy individuals
@@ -187,6 +189,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             run(Firms.SetInitialStockOfIntermediateGoods());
 
             // set sector specific wages and sector specific pricing of goods
+            //TODO: check if the good traded needs to be sector specific
             run(Firms.sendVacancies(), Economy.SetFirmProperties(), Firms.SetSectorSpecifics());
 
             // dividing households into investors and workers
@@ -225,8 +228,11 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         // the productivity of the firm is dependant on the productivity of the workers
         run(Households.sendProductivity(), Firms.CalculateFirmProductivity());
 
+
         // Firms produce their good according to the productivity of the firm, the number of workers and the size of the firm
         run(Firms.FirmsProduce());
+
+//        run(Firms.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firms.receiveIntermediateGoodsAndDemand());
 
         // calculates the average price of products and sends it to the firms
         // this is needed for the firm to update its strategy
@@ -253,6 +259,9 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                         Households.updateFromPurchase()
                 )
         );
+
+        //TODO: update inflation so that it considers intermediate goods as well (?)
+        run(Firms.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firms.receiveIntermediateGoodsAndDemand());
 
 
         //TODO: check if all the functions below are right
@@ -282,10 +291,16 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         // updates firms' vacancies according to the new target production
         run(Firms.UpdateVacancies());
 
-        // with the updated vacancies, the firms hire if they don't need anymore workers
-        // workers that had already applied can now apply in the next hiring round
+        // check how long the worker has been unemployed
+        run(Households.checkLengthOfUnemployment());
+
+        // with the updated vacancies, the firms fire if they don't need any more worker's
+        // worker's that had already applied can now apply in the next hiring round
         run(Households.JobCheck(), Firms.FireWorkers(), Households.CheckIfFired());
         run(Households.UnemployedWorkerCanApply());
+
+        // check if the worker can upgrade its skills
+        run(Households.UpgradeSkills());
 
         // firms can change sizes depending on the employees it has
         run(Firms.UpdateFirmSize());

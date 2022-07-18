@@ -132,5 +132,15 @@ public class Messages {
         public double price;
     }
 
+    public static class IntermediateGoodBought extends Message {
+        public int quantity;
+        public double spent;
+    }
+
+    public static class DemandOfIntermediateGood extends Message {
+        public int demand;
+        public int bought;
+    }
+
 }
 

@@ -24,13 +24,15 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double firingRate;
     public double priceOfGoods;
     @Variable
-    public double productivity;
+    public double productivity = 0.00d;
     @Variable
     public long stock;
-    @Variable
     public int demand;
     @Variable
+    public int demandOfIntermediateGoods = 0;
+    @Variable
     public long inventory = 0;
+    public long inventoryOfIntermediateGoods = 0;
     @Variable
     public double earnings = 0.0d;
     public double dividend = 0;
@@ -42,11 +44,12 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double averagePrice;
     public boolean isHiring = true;
     public int workersToBeFired = 0;
-    public int intermediateGood; // the intermediate good it needs, i.e. good 0
+    public int intermediateGood; // the intermediate good it needs for production of its own good, i.e. good 0
     public int stockOfIntermediateGood; // how much of that good it has
     public double intermediateGoodConstant;
-    public long intermediateGoodQuantityProduced;
+    public long intermediateGoodQuantityProduced; // intermediate good produced for other firms
     public double priceOfIntermediateGood;
+    public double spentOnIntermediateGoods;
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
@@ -56,14 +59,14 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             if (firm.sizeOfCompany == 0) {
                 firm.vacancies = (int) firm.getPrng().uniform(1, 50).sample();
             } else if (firm.sizeOfCompany == 1) {
-                firm.vacancies = (int) firm.getPrng().uniform(50, 200).sample();
+                firm.vacancies = (int) firm.getPrng().uniform(50, 1000).sample();
             } else {
-                firm.vacancies = (int) firm.getPrng().uniform(200, 5000).sample();
+                firm.vacancies = (int) firm.getPrng().uniform(1000, 5000).sample();
             }
         });
     }
 
-    public static Action<Firms> SetInitialStockOfIntermediateGoods(){
+    public static Action<Firms> SetInitialStockOfIntermediateGoods() {
         return Action.create(Firms.class, firm -> {
             // I am assuming a one on one relationship, for one unit of good, one intermediate good is needed
             // Ideally, a firm will have 100% productivity so target output would be the initial vacancies * 100% productivity = initial stock of intermediate goods
@@ -132,13 +135,13 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Firms> updateVacancies() {
-        // hires workers and adjusts vacancies
         return Action.create(Firms.class, firm -> {
+            // hires workers and adjusts vacancies
             if (firm.hasMessageOfType(Messages.NewEmployee.class)) {
                 firm.getMessagesOfType(Messages.NewEmployee.class).forEach(msg -> {
                     firm.addLink(msg.workerID, Links.FirmToWorkerLink.class);
                     firm.vacancies--;
-                    firm.workers += 1;
+                    firm.workers++;
                 });
             }
         });
@@ -147,15 +150,13 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> CalculateFirmProductivity() {
         return Action.create(Firms.class, firm -> {
+
+            // productivity is set to 0 by default
             if (firm.hasMessageOfType(Messages.Productivity.class)) {
                 firm.getMessagesOfType(Messages.Productivity.class).forEach(msg -> {
                     firm.productivity += msg.productivity;
                 });
                 firm.productivity /= firm.workers;
-
-            // if the firm doesn't have workers, it's productivity is set to 0
-            } else {
-                firm.productivity = 0;
             }
         });
     }
@@ -168,17 +169,17 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             //TODO: check if this is a fair assumption
 
             // this means it has enough intermediate goods for production
-            if (firm.workers <= firm.stockOfIntermediateGood){
+            if (firm.workers <= firm.stockOfIntermediateGood) {
                 firm.intermediateGoodConstant = 1.00d;
-                firm.intermediateGood -= firm.workers;
+                firm.stockOfIntermediateGood -= firm.workers;
 
             // if the firm doesn't have any intermediate good it can't produce
-            } else if (firm.stockOfIntermediateGood == 0){
+            } else if (firm.stockOfIntermediateGood == 0) {
                 firm.intermediateGoodConstant = 0.00d;
 
             // the workers a firm has is the maximum amount of goods it can produce
             // to produce all of the goods it needs the same amount of workers as intermediate goods
-            } else if (firm.stockOfIntermediateGood < firm.workers){
+            } else if (firm.stockOfIntermediateGood < firm.workers) {
                 firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
                 firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
             }
@@ -190,25 +191,19 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Firms> SendIntermediateGoodInfo(){
+    public static Action<Firms> SendIntermediateGoodInfo() {
         return Action.create(Firms.class, firm -> {
             // sends the message of the good it is producing as intermediate good
             firm.send(Messages.StockOfIntermediateGood.class, message -> {
-               message.price = firm.priceOfIntermediateGood;
-               message.stock = firm.intermediateGoodQuantityProduced;
+                message.price = firm.priceOfIntermediateGood;
+                message.stock = firm.intermediateGoodQuantityProduced;
             }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
-        });
-    }
 
-    public static Action<Firms> PurchaseIntermediateGoods(){
-        return Action.create(Firms.class, firm -> {
-            // sends the message to the intermediate good it wants to purchase
-            // if the firm does not have enough intermediate goods to produce it's maximum output, it purchases
-            if (firm.stockOfIntermediateGood < firm.workers){
-                firm.send(Messages.PurchaseIntermediateGood.class, m -> {
-                   m.demand = firm.workers - firm.stockOfIntermediateGood;
-                }).to(firm.getGlobals().goodExchangeIDs.get(firm.intermediateGood));
-            }
+
+            firm.send(Messages.PurchaseIntermediateGood.class, m -> {
+                m.demand = firm.workers - firm.stockOfIntermediateGood;
+            }).to(firm.getGlobals().goodExchangeIDs.get(firm.intermediateGood));
+
         });
     }
 
@@ -219,6 +214,31 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                 m.output = firm.stock;
                 m.price = firm.priceOfGoods;
             }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
+        });
+    }
+
+    public static Action<Firms> receiveIntermediateGoodsAndDemand() {
+        return Action.create(Firms.class, firm -> {
+
+            // receive the intermediate good needed for production
+            if (firm.hasMessageOfType(Messages.IntermediateGoodBought.class)) {
+                firm.getMessagesOfType(Messages.IntermediateGoodBought.class).forEach(message -> {
+                    firm.stockOfIntermediateGood += message.quantity;
+                    firm.spentOnIntermediateGoods = message.spent;
+                });
+            }
+
+            // receive demand of the intermediate good
+            if (firm.hasMessageOfType(Messages.DemandOfIntermediateGood.class)) {
+                firm.getMessagesOfType(Messages.DemandOfIntermediateGood.class).forEach(message -> {
+                    firm.demandOfIntermediateGoods += message.demand;
+                    firm.intermediateGoodQuantityProduced -= message.bought;
+                    firm.earnings += message.bought * firm.priceOfIntermediateGood;
+                });
+
+                firm.inventoryOfIntermediateGoods += firm.intermediateGoodQuantityProduced;
+                firm.intermediateGoodQuantityProduced = 0;
+            }
         });
     }
 
@@ -236,7 +256,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     if (firm.stock > 0) {
                         firm.stock -= purchaseMessage.bought;
                         // cash received from the goods sold -> without subtracting costs of production and payment to workers/investors
-                        firm.earnings += firm.priceOfGoods;
+                        firm.earnings += firm.priceOfGoods * purchaseMessage.bought;
                     }
                 });
 
@@ -309,10 +329,12 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> sendPrice() {
         return Action.create(Firms.class, firm -> {
-            firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmsPrice.class, (m, l) -> {
-                m.price = firm.priceOfGoods;
-                m.output = firm.stock;
-            });
+            if (firm.previousOutput > 0) {
+                firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmsPrice.class, (m, l) -> {
+                    m.price = firm.priceOfGoods;
+                    m.output = firm.stock;
+                });
+            }
         });
     }
 
@@ -329,6 +351,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     firm.priceOfGoods = firm.priceOfGoods * (1.0d - firm.getGlobals().gamma_p * firm.getPrng().uniform(0, 1).sample());
                 }
             }
+            firm.demand = 0;
         });
     }
 
@@ -352,14 +375,14 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             TreeMap<Double, Long> workers = new TreeMap<>();
             if (firm.hasMessageOfType(Messages.JobCheck.class)) {
                 firm.getMessagesOfType(Messages.JobCheck.class).forEach(msg -> {
-                            workers.put(msg.productivity, msg.getSender());
-                        });
+                    workers.put(msg.productivity, msg.getSender());
+                });
             }
 
-            if (!firm.isHiring){
+            if (!firm.isHiring) {
                 // if it wants to fire all the workers the firm sends a message to all its employees
                 // reducing computational complexity by doing it this way
-                if (firm.workersToBeFired == firm.workers){
+                if (firm.workersToBeFired == firm.workers) {
                     firm.getLinks(Links.FirmToWorkerLink.class).send(Messages.Fired.class);
                 }
             } else {
@@ -376,13 +399,13 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Firms> UpdateFirmSize() {
         return Action.create(Firms.class, firm -> {
-           if (firm.workers >= 10){
-               firm.sizeOfCompany = 0;
-           } else if (firm.workers > 10 && firm.workers <= 100){
-               firm.sizeOfCompany = 1;
-           } else {
-               firm.sizeOfCompany = 2;
-           }
+            if (firm.workers >= 10) {
+                firm.sizeOfCompany = 0;
+            } else if (firm.workers > 10 && firm.workers <= 100) {
+                firm.sizeOfCompany = 1;
+            } else {
+                firm.sizeOfCompany = 2;
+            }
         });
     }
 }

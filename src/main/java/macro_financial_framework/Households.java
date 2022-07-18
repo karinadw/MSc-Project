@@ -13,7 +13,6 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     @Variable
     public double accumulatedSalary;
     public double savings; // their initial wealth
-
     public double wealth = accumulatedSalary + savings;
     public double wage;
     public double unemploymentBenefits;
@@ -24,7 +23,9 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
 
     public Status status = Status.WORKER_UNEMPLOYED; //everyone starts by being unemployed
+    public int lenghtOfUnemployment = 0;
     public HashMap<Integer, Double> budget;
+    public int lenOfUnemployment = 0;
 
     public static Action<Households> ApplyForInvestor() {
         return Action.create(Households.class, investor -> {
@@ -73,8 +74,8 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Households> sendProductivity() {
         return Action.create(Households.class, worker -> {
-            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.Productivity.class, (m, l) -> {
-                m.productivity = worker.productivity;
+            worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.Productivity.class, (productivityMessage, linkToFirm) -> {
+                productivityMessage.productivity = worker.productivity;
             });
         });
     }
@@ -94,9 +95,11 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> sendDemand() {
         return Action.create(Households.class, worker -> {
             worker.budget.forEach((good, budget) -> {
-                worker.send(Messages.HouseholdDemand.class, m -> {
-                    m.consumptionBudget = budget;
-                }).to(worker.getGlobals().goodExchangeIDs.get(good));
+                if (budget > 0) {
+                    worker.send(Messages.HouseholdDemand.class, m -> {
+                        m.consumptionBudget = budget;
+                    }).to(worker.getGlobals().goodExchangeIDs.get(good));
+                }
             });
         });
     }
@@ -146,6 +149,14 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+    public static Action<Households> checkLengthOfUnemployment(){
+        return Action.create(Households.class, worker -> {
+           if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED || worker.status == Status.WORKER_UNEMPLOYED){
+               worker.lenOfUnemployment += 1;
+           }
+        });
+    }
+
     public static Action<Households> JobCheck() {
         return Action.create(Households.class, worker -> {
             worker.getLinks(Links.WorkerToFirmLink.class).send(Messages.JobCheck.class, (m, l) -> {
@@ -168,6 +179,17 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
             if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
                 worker.status = Status.WORKER_UNEMPLOYED;
             }
+        });
+    }
+
+    public static Action<Households> UpgradeSkills() {
+        return Action.create(Households.class, worker -> {
+            // if the worker has been unemployed for a year or longer, the worker has a chance of upgrading its productivity
+           if (worker.lenOfUnemployment >= 12){
+               double diff = 1.00 - worker.productivity; // a worker can´t have a productivity higher than one
+               // there is a 50% chance of upgrading its skills
+               worker.productivity = worker.productivity + (worker.getPrng().getNextInt(2) * worker.getPrng().getNextDouble(diff));
+           }
         });
     }
 
