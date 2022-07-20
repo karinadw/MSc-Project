@@ -13,6 +13,4 @@ public class Links {
     public static class FirmToBuyerLink extends Link.Empty{}
     public static class GoodsMarketToEconomy extends Link.Empty{}
 
-
-
 }

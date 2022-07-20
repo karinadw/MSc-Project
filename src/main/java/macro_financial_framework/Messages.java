@@ -142,5 +142,11 @@ public class Messages {
         public int bought;
     }
 
+    public static class PaidDebtOfIndebtedFirm extends Message {
+        public double debt;
+    }
+
+    public static class NoDebt extends Message.Empty{}
+
 }
 

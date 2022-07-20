@@ -17,20 +17,20 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public static class Globals extends GlobalState {
 
         @Input
-        public long nbFirms = 50;
+        public long nbFirms = 500;
 
         @Input
-        public long nbWorkers = 100;
+        public long nbWorkers = 1000;
 
         @Input
         public int nbSectors = 21;
 
         @Input
-        public double c = 0.025d; // this is for calculating the consumption budget
+        public double c = 0.015d; // this is for calculating the consumption budget
 
         @Input
         //TODO: refactor this as I have named the productivity of a firm alpha
-        public double alpha = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
+        public double delta = 0.02d; // this is used for calculating the dividend for investors (dividend = alpha * profit)
 
         // TODO: copied the number from Mark 0 model
         @Input(name = "ettaPlus")
@@ -126,7 +126,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
-                household.savings = household.getPrng().uniform(10000.00, 20000.00).sample();
+                household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
                 double moneyToSpend = 0.025 * household.savings;
                 int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
                 for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
@@ -279,10 +279,15 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
 
         // Firm accounting
-        run(Firms.Accounting());
+        // if firm can (earnings and profits are positive), it will pay out dividends to investor
+        run(Firms.Accounting(), Households.getDividends());
+        run(Firms.sendHealthyFirmAccount(), Economy.receiveHealthyFirmAccounts());
 
-        //firms pay out dividends to investors if earnings and profits are positive
-        run(Firms.payInvestors(), Households.getDividends());
+        // Checking for firm defaults
+        run(Firms.sendBailoutRequest(), Economy.receiveIndebtedFirmDebt());
+        run(Economy.checkDefaults(), Firms.paymentOfIndebtedFirm());
+        run(Economy.sendBailoutPackages(), Firms.receiveBailoutPackage());
+        run(Economy.sendBankruptcyMessages(), Firms.receiveBankruptcyMessage());
 
 
         //update the target production to meet the demand

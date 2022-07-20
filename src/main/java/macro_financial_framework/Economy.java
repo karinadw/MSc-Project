@@ -198,40 +198,6 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-
-//    public static Action<Economy> sendDemandToFirm() {
-//        return Action.create(Economy.class, economy -> {
-////            economy.supplyOfFirms.clear();
-//            economy.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
-//                economy.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.sector, firmSupply.output, firmSupply.price));
-//            });
-//
-////            economy.demandOfHousehold.clear();
-//            economy.getMessagesOfType(Messages.HouseholdDemand.class).forEach(householdDemand -> {
-//                economy.householdsDemandingGoods.add(new HouseholdDemandInformation(householdDemand.getSender(), householdDemand.sectorOfGoods, householdDemand.consumptionBudget));
-//            });
-//
-//
-//            // as of now just matching the good that the household is requesting to the sector of the firm
-//            // sending the demand for that good
-//            //TODO: households select good of lowest price
-//            economy.householdsDemandingGoods.forEach(household -> {
-//
-//                Optional<FirmSupplyInformation> firmToPurchaseFrom = economy.firmsSupplyingGoods.stream().filter(firm -> firm.sectorOfFirm == household.sectorOfGoodsToPurchase).findAny();
-//
-//                // sends a message to the firm with the ID of the household and the amount of goods it wants to purchase from that firm
-//                if (firmToPurchaseFrom.isPresent()) {
-//                    FirmSupplyInformation firmSupply = firmToPurchaseFrom.get();
-//                    int goodsDemanded = (int) Math.floor(household.consumptionBudget / firmSupply.price);
-//                    economy.send(Messages.HouseholdWantsToPurchase.class, messageOfHouseholdDemand -> {
-//                        messageOfHouseholdDemand.HouseholdID = household.ID;
-//                        messageOfHouseholdDemand.demand = goodsDemanded;
-//                    }).to(firmSupply.ID);
-//                }
-//            });
-//        });
-//    }
-
     public static Action<Economy> calculateUnemploymentAndAavailableWorkers() {
         return Action.create(Economy.class, market -> {
             if (market.hasMessageOfType(Messages.Unemployed.class)) {
@@ -301,6 +267,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Economy> receiveHealthyFirmAccounts() {
         return Action.create(Economy.class, economy -> {
+            economy.healthyFirmAccountMap.clear();
             economy.getMessagesOfType(Messages.HealthyFirmAccountMessage.class).forEach(msg -> {
                 economy.healthyFirmAccountMap.put(msg.getSender(), msg.healthyFirmAccount);
             });
@@ -309,6 +276,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Economy> receiveIndebtedFirmDebt() {
         return Action.create(Economy.class, economy -> {
+            economy.indebtedFirmsMap.clear();
             economy.getMessagesOfType(Messages.BailoutRequestMessage.class).forEach(msg -> {
                 economy.indebtedFirmsMap.put(msg.getSender(), msg.debt);
             });
@@ -317,39 +285,44 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Economy> checkDefaults() {
         return Action.create(Economy.class, economy -> {
-            economy.indebtedFirmsMap.forEach((firmID, debt) -> {
+            economy.indebtedFirmsMap.forEach((indebtedFirmID, debt) -> {
                 if (economy.healthyFirmAccountMap.size() > 0) {
+
+                    // list of IDs of the healthy firms
                     ArrayList<Long> healthyFirmIDs = new ArrayList<>(economy.healthyFirmAccountMap.keySet());
+
+                    // chooses a random healthy firm
                     int idx = economy.getPrng().generator.nextInt(economy.healthyFirmAccountMap.size());
                     long healthyFirmID = healthyFirmIDs.get(idx);
+
+                    // first condition is the random probability of the healthy firm acquiring the indebted firm
                     if ((economy.getPrng().uniform(0, 1).sample() < 1 - economy.getGlobals().f) & (economy.healthyFirmAccountMap.get(healthyFirmID).deposits > -debt)) {
-                        economy.healthyFirmAccountMap.get(firmID).updateDeposits(debt);
-                        economy.bailedOutFirmsMap.put(firmID, new BailoutPackage(economy.healthyFirmAccountMap.get(firmID).price, economy.healthyFirmAccountMap.get(firmID).wage));
+
+                        // the healthy firm pays off the debt of the indebted firm
+                        economy.healthyFirmAccountMap.get(healthyFirmID).updateDeposits(debt);
+                        economy.send(Messages.PaidDebtOfIndebtedFirm.class, paymentOdDebtMessage -> {
+                           paymentOdDebtMessage.debt = debt;
+                        }).to(healthyFirmID);
+
+                        // the indebted firm no longer has any debt
+                        // not too sure if I need to do this in this step
+                        // economy.send(Messages.NoDebt.class).to(indebtedFirmID);
+                        economy.bailedOutFirmsMap.put(indebtedFirmID, new BailoutPackage(economy.healthyFirmAccountMap.get(healthyFirmID).price, economy.healthyFirmAccountMap.get(healthyFirmID).wage));
                     }
                     else {
                         economy.deficit -= debt;
-                        economy.bankruptFirmsArray.add(firmID);
+                        economy.bankruptFirmsArray.add(indebtedFirmID);
                     }
                 }
                 else {
                     economy.deficit -= debt;
-                    economy.bankruptFirmsArray.add(firmID);
+                    economy.bankruptFirmsArray.add(indebtedFirmID);
                 }
             });
             economy.indebtedFirmsMap.clear();
         });
     }
 
-    public static Action<Economy> sendHealthyFirmDeposits() {
-        return Action.create(Economy.class, economy -> {
-            economy.healthyFirmAccountMap.forEach((firmID, healthyFirmAccount) -> {
-                economy.getLinksTo(firmID, Links.EconomyToFirm.class).send(Messages.DepositsMessage.class, (msg, link) -> {
-                    msg.cash = healthyFirmAccount.deposits;
-                });
-            });
-            economy.healthyFirmAccountMap.clear();
-        });
-    }
 
     public static Action<Economy> sendBailoutPackages() {
         return Action.create(Economy.class, economy -> {

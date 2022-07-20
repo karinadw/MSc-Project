@@ -39,7 +39,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double previousOutput;
     public double targetProduction;
     public int good;
-    public double deposits;
+    public double deposits = 100000000;
     public int availableWorkers;
     public double averagePrice;
     public boolean isHiring = true;
@@ -50,18 +50,24 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public long intermediateGoodQuantityProduced; // intermediate good produced for other firms
     public double priceOfIntermediateGood;
     public double spentOnIntermediateGoods;
+    public boolean healthy;
+    public boolean isProductive = true;
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
             // set vacancies according to firm size
             // TODO: check if logic makes sense -> check the numbers
             // potential resources: https://www.statista.com/statistics/676671/employees-by-business-size-uk/
-            if (firm.sizeOfCompany == 0) {
-                firm.vacancies = (int) firm.getPrng().uniform(1, 50).sample();
-            } else if (firm.sizeOfCompany == 1) {
-                firm.vacancies = (int) firm.getPrng().uniform(50, 1000).sample();
+            if (firm.isProductive) {
+                if (firm.sizeOfCompany == 0) {
+                    firm.vacancies = (int) firm.getPrng().uniform(1, 50).sample();
+                } else if (firm.sizeOfCompany == 1) {
+                    firm.vacancies = (int) firm.getPrng().uniform(50, 1000).sample();
+                } else {
+                    firm.vacancies = (int) firm.getPrng().uniform(1000, 5000).sample();
+                }
             } else {
-                firm.vacancies = (int) firm.getPrng().uniform(1000, 5000).sample();
+                firm.vacancies = 0;
             }
         });
     }
@@ -125,7 +131,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         // send vacancies of the firm
         return Action.create(Firms.class, firms -> {
             // al firms are hiring at the beggining
-            if (firms.isHiring) {
+            if (firms.isHiring && firms.isProductive) {
                 firms.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmInformation.class, (msg, link) -> {
                     msg.vacancies = firms.vacancies;
                     msg.sector = firms.sector;
@@ -167,25 +173,28 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             // depending on the size of the firm -> workers can produce more or less goods
             // this is assuming that larger companies have more facilities
             //TODO: check if this is a fair assumption
-
             // this means it has enough intermediate goods for production
-            if (firm.workers <= firm.stockOfIntermediateGood) {
-                firm.intermediateGoodConstant = 1.00d;
-                firm.stockOfIntermediateGood -= firm.workers;
+            if (firm.isProductive) {
+                if (firm.workers <= firm.stockOfIntermediateGood) {
+                    firm.intermediateGoodConstant = 1.00d;
+                    firm.stockOfIntermediateGood -= firm.workers;
 
-            // if the firm doesn't have any intermediate good it can't produce
-            } else if (firm.stockOfIntermediateGood == 0) {
-                firm.intermediateGoodConstant = 0.00d;
+                    // if the firm doesn't have any intermediate good it can't produce
+                } else if (firm.stockOfIntermediateGood == 0) {
+                    firm.intermediateGoodConstant = 0.00d;
 
-            // the workers a firm has is the maximum amount of goods it can produce
-            // to produce all of the goods it needs the same amount of workers as intermediate goods
-            } else if (firm.stockOfIntermediateGood < firm.workers) {
-                firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
-                firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
+                    // the workers a firm has is the maximum amount of goods it can produce
+                    // to produce all of the goods it needs the same amount of workers as intermediate goods
+                } else if (firm.stockOfIntermediateGood < firm.workers) {
+                    firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
+                    firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
+                }
+                firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant);
+                firm.intermediateGoodQuantityProduced = firm.stock;
+            } else {
+                firm.stock = 0;
+                firm.intermediateGoodQuantityProduced = 0;
             }
-            firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant);
-            firm.intermediateGoodQuantityProduced = firm.stock;
-
             //TODO: check if this is a valid assumption
             firm.priceOfIntermediateGood = firm.priceOfGoods / 2;
         });
@@ -276,25 +285,11 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Firms> payInvestors() {
-        // pays the investors if the firm is generating positive profits
-        return Action.create(Firms.class, firm -> {
-            if (firm.profit > 0 && firm.deposits > 0) {
-                firm.dividend = firm.profit * firm.getGlobals().alpha;
-                firm.profit -= firm.dividend;
-                firm.getLinks(Links.FirmToInvestorLink.class).send(Messages.PayInvestors.class, (dividendPayment, firmToInvestorLink) -> {
-                    dividendPayment.dividend = firm.dividend;
-                });
-            }
-        });
-    }
-
     public static Action<Firms> GetAveragePrice() {
         return Action.create(Firms.class, firm -> {
             firm.getMessagesOfType(Messages.AveragePrice.class).forEach(msg -> {
-                        firm.averagePrice = msg.averagePrice;
-                    }
-            );
+                firm.averagePrice = msg.averagePrice;
+            });
         });
     }
 
@@ -302,11 +297,76 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firms.class, firm -> {
             // the profit is the difference between the cost of production (wage * nb of employees) and the products sold
             // might be negative as even if firms don't sell anything, they need to pay workers
-            // TODO: haven't added health of a firm (check if its needed or not)
-            firm.profit = firm.earnings - (firm.wage * firm.workers);
-            firm.deposits += firm.demand;
+            firm.healthy = false;
+            if (firm.isProductive) {
+                firm.profit = firm.earnings - (firm.wage * firm.workers);
+                firm.deposits += firm.profit;
+
+                // check if the firm can pay dividends
+                if (firm.profit > 0 && firm.deposits > 0) {
+                    firm.dividend = firm.profit * firm.getGlobals().delta;
+                    firm.profit -= firm.dividend;
+                    firm.getLinks(Links.FirmToInvestorLink.class).send(Messages.PayInvestors.class, (dividendPayment, firmToInvestorLink) -> {
+                        dividendPayment.dividend = firm.dividend;
+                    });
+                }
+
+                // check health of the firm
+                if (firm.deposits > firm.getGlobals().Theta * firm.previousOutput * firm.wage) {
+                    firm.healthy = true;
+                }
+            }
         });
     }
+
+    public static Action<Firms> sendBailoutRequest() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.isProductive & (firm.deposits < -firm.getGlobals().Theta * firm.previousOutput * firm.wage))
+                firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.BailoutRequestMessage.class, (msg, link) -> {
+                    msg.debt = firm.deposits;
+                });
+        });
+    }
+
+    public static Action<Firms> sendHealthyFirmAccount() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.healthy)
+                firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.HealthyFirmAccountMessage.class, (msg, link) -> {
+                    msg.healthyFirmAccount = new HealthyFirmAccount(firm.deposits, firm.priceOfGoods, firm.wage);
+                });
+        });
+    }
+
+    public static Action<Firms> paymentOfIndebtedFirm() {
+        return Action.create(Firms.class, firm -> {
+            if (firm.hasMessageOfType(Messages.PaidDebtOfIndebtedFirm.class)) {
+                firm.getMessagesOfType(Messages.PaidDebtOfIndebtedFirm.class).forEach(msg -> {
+                    firm.deposits += msg.debt;
+                });
+            }
+        });
+    }
+
+    public static Action<Firms> receiveBailoutPackage() {
+        return Action.create(Firms.class, firm -> {
+            firm.getMessagesOfType(Messages.BailoutPackageMessage.class).forEach(msg -> {
+                firm.priceOfGoods = msg.price;
+                firm.wage = msg.wage;
+                firm.deposits = 0;
+            });
+        });
+    }
+
+    public static Action<Firms> receiveBankruptcyMessage() {
+        return Action.create(Firms.class, firm -> {
+            firm.getMessagesOfType(Messages.BankruptcyMessage.class).forEach(msg -> {
+                firm.deposits = 0;
+                firm.isProductive = false;
+                firm.targetProduction = 0;
+            });
+        });
+    }
+
 
     public static Action<Firms> sendInfoToGetAvailableWorkers() {
         return Action.create(Firms.class, firm -> {
