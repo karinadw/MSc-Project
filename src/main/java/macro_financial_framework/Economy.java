@@ -206,9 +206,9 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             }
 
             // send the current unemployment to the firms -> available workers
-//            market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
-//                unemploymentMessage.unemployment = market.unemployment;
-//            });
+            market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
+                unemploymentMessage.unemployment = market.unemployment;
+            });
 
             HashMap<Long, Integer> availableWorkers = new HashMap<Long, Integer>();
             if (market.hasMessageOfType(Messages.Unemployed.class)) {

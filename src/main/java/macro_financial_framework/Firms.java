@@ -39,7 +39,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double previousOutput;
     public double targetProduction;
     public int good;
-    public double deposits = 100000000;
+    public double deposits = 1000000;
     public int availableWorkers;
     public double averagePrice;
     public boolean isHiring = true;
@@ -52,6 +52,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double spentOnIntermediateGoods;
     public boolean healthy;
     public boolean isProductive = true;
+    public double debt = 0;
+    public int totalUnemployment;
 
     public static Action<Firms> SetVacancies() {
         return Action.create(Firms.class, firm -> {
@@ -367,6 +369,22 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+    public static Action<Firms> doRevival() {
+        return Action.create(Firms.class, firm -> {
+            if (!firm.isProductive & (firm.getPrng().uniform(0, 1).sample() < firm.getGlobals().phi)) {
+                firm.isProductive = true;
+                firm.priceOfGoods = firm.averagePrice;
+                firm.targetProduction = firm.getGlobals().mu * firm.totalUnemployment;
+                firm.deposits = firm.targetProduction * firm.wage;
+
+                // send message to investor so that he revives the firm
+                firm.getLinks(Links.FirmToInvestorLink.class).send(Messages.InvestorPaysRevival.class, (m,l) -> {
+                    m.debt = firm.deposits;
+                });
+            }
+        });
+    }
+
 
     public static Action<Firms> sendInfoToGetAvailableWorkers() {
         return Action.create(Firms.class, firm -> {
@@ -383,6 +401,11 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                             msg.workers = firm.availableWorkers;
                         }
                 );
+            }
+            if (firm.hasMessageOfType(Messages.CurrentUnemployment.class)) {
+                firm.getMessagesOfType(Messages.CurrentUnemployment.class).forEach(msg -> {
+                    firm.totalUnemployment = msg.unemployment;
+                });
             }
         });
     }

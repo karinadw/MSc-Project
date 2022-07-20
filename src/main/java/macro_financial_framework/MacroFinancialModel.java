@@ -26,7 +26,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         public int nbSectors = 21;
 
         @Input
-        public double c = 0.015d; // this is for calculating the consumption budget
+        public double c = 0.010d; // this is for calculating the consumption budget
 
         @Input
         //TODO: refactor this as I have named the productivity of a firm alpha
@@ -278,6 +278,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         run(Households.updateConsumptionBudget());
 
 
+        // TODO: re-write those functions that are same as Mark 0
         // Firm accounting
         // if firm can (earnings and profits are positive), it will pay out dividends to investor
         run(Firms.Accounting(), Households.getDividends());
@@ -289,6 +290,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         run(Economy.sendBailoutPackages(), Firms.receiveBailoutPackage());
         run(Economy.sendBankruptcyMessages(), Firms.receiveBankruptcyMessage());
 
+        // Revival of firms
+        run(Firms.doRevival(), Households.ReviveFirm());
 
         //update the target production to meet the demand
         run(Firms.adjustPriceProduction());

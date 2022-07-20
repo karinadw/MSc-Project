@@ -203,6 +203,14 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
+    public static Action<Households> ReviveFirm() {
+        return Action.create(Households.class, investor -> {
+           if (investor.hasMessageOfType(Messages.InvestorPaysRevival.class)){
+               investor.wealth -= investor.getMessageOfType(Messages.InvestorPaysRevival.class).debt;
+           }
+        });
+    }
+
 }
 
 

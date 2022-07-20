@@ -148,5 +148,9 @@ public class Messages {
 
     public static class NoDebt extends Message.Empty{}
 
+    public static class InvestorPaysRevival extends Message {
+        public double debt;
+    }
+
 }
 
