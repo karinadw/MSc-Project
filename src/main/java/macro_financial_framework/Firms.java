@@ -20,8 +20,6 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double profit = 0;
     @Variable
     public double wage;
-    @Input
-    public double firingRate;
     public double priceOfGoods;
     @Variable
     public double productivity = 0.00d;
@@ -39,7 +37,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public double previousOutput;
     public double targetProduction;
     public int good;
-    public double deposits = 1000000;
+    public double deposits = 100000;
     public int availableWorkers;
     public double averagePrice;
     public boolean isHiring = true;
@@ -104,8 +102,8 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public static Action<Firms> SetPriceOfGoods() {
         return Action.create(Firms.class, firm -> {
             //TODO: check how to make logical assumptions about pricing
-            //TODO: add the possibility of having another good
-            double price = firm.getPrng().uniform(10.00, 1000.00).sample();
+            //TODO: price of non competitive goods should be higher
+            double price = firm.getPrng().uniform(10.00, 50.00).sample();
             firm.priceOfGoods = price;
         });
     }

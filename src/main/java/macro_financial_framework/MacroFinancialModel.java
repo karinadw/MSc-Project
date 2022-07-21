@@ -17,10 +17,10 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
     public static class Globals extends GlobalState {
 
         @Input
-        public long nbFirms = 500;
+        public long nbFirms = 1000;
 
         @Input
-        public long nbWorkers = 1000;
+        public long nbWorkers = 2500;
 
         @Input
         public int nbSectors = 21;
@@ -62,6 +62,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         @Input(name="phi")
         public double phi = 0.1d;
 
+        public double nbExclusiveGoods = 0.2d; // its a percentage
+        public double percentageWealthyHouseholds = 0.1;
     }
 
     @Override
@@ -100,7 +102,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 //            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
             getGlobals().goodExchangeIDs.put(i, goodsVariable.getID()); // so that the good can be accessed from globals instead of adding links
 
-            int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
+            int exclusiveGoods = (int) Math.ceil(getGlobals().nbExclusiveGoods * getGlobals().nbGoods);
             if (i >= exclusiveGoods) {
                 goodsVariable.competitive = false; // goods only purchased by very wealthy individuals
             } else {
@@ -112,7 +114,6 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors); // get next int creates a random variable until limit - 1, so with this range we get values from 0 to 20
-            firm.firingRate = 0.05;
             firm.sizeOfCompany = firm.getPrng().getNextInt(3); //start-up: 0, medium-sized: 1, large company: 2
         });
 
@@ -123,12 +124,14 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             // skewed distribution of wealth
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
             household.budget = new HashMap<Integer, Double>();
-            if (householdNumber < (getGlobals().nbWorkers - Math.ceil(0.1 * getGlobals().nbWorkers))) {
+
+            // TODO: Check the variables here : percetange of rich households and percentage of exclusive goods
+            if (householdNumber < (getGlobals().nbWorkers - Math.ceil(getGlobals().percentageWealthyHouseholds * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
-                household.savings = household.getPrng().uniform(100000.00, 200000.00).sample();
-                double moneyToSpend = 0.025 * household.savings;
-                int exclusiveGoods = (int) Math.ceil(0.2 * getGlobals().nbGoods);
+                household.savings = household.getPrng().uniform(1000000.00, 2000000.00).sample();
+                double moneyToSpend = getGlobals().c * household.savings;
+                int exclusiveGoods = (int) Math.ceil(getGlobals().nbExclusiveGoods * getGlobals().nbGoods);
                 for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
                     household.budget.put(j, moneyToSpend / ((getGlobals().nbGoods) - exclusiveGoods));
                 }
@@ -137,7 +140,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
                 household.rich = true;
                 household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
 
-                double moneyToSpend = 0.025 * household.savings;
+                double moneyToSpend = getGlobals().c * household.savings;
                 // wealthy individuals spend on luxury goods as well
                 // they spend on all goods
                 for (int j = 0; j < getGlobals().nbGoods; j++) {

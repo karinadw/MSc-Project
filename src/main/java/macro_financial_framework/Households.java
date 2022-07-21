@@ -100,6 +100,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
                         m.consumptionBudget = budget;
                     }).to(worker.getGlobals().goodExchangeIDs.get(good));
                 }
+                worker.consumptionBudget += budget;
             });
         });
     }
@@ -108,32 +109,30 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> updateFromPurchase() {
         return Action.create(Households.class, household -> {
             if (household.hasMessageOfType(Messages.PurchaseCompleted.class)) {
-                household.wealth -= household.getMessageOfType(Messages.PurchaseCompleted.class).spent;
-
-                // keeping track of the total consumption budget of the households
-                household.budget.forEach((good, budget) -> household.consumptionBudget += budget);
-
                 // the household saves the money that it hasn't used when purchasing
-                household.savings = household.consumptionBudget - household.getMessageOfType(Messages.PurchaseCompleted.class).spent;
+                household.savings -= household.getMessageOfType(Messages.PurchaseCompleted.class).spent;
             }
         });
     }
 
     public static Action<Households> updateConsumptionBudget() {
-        //TODO: update this method for any number of goods
         //update the consumption budget for each good after spending and receiving an income
         return Action.create(Households.class, household -> {
+            // the new consumption budget for the next time period
+            household.consumptionBudget = household.getGlobals().c * household.wealth;
             if (!household.rich) {
-                // if the household is of common wealth it will only purchase competitive goods, as of now these are 2
-                double toSpend = household.consumptionBudget / 2;
+                // if the household is of common wealth it will only purchase all the goods except the exclusive ones
+                int exclusiveGoods = (int) Math.ceil(0.2 * household.getGlobals().nbGoods);
+                int goodsToPurchase = household.getGlobals().nbGoods - exclusiveGoods;
+                double toSpend = household.consumptionBudget / goodsToPurchase;
                 household.budget.clear();
-                for (int i = 0; i < 2; i++) {
+                for (int i = 0; i < goodsToPurchase; i++) {
                     household.budget.put(i, toSpend);
                 }
             } else {
-                double toSpend = household.consumptionBudget / 3;
+                double toSpend = household.consumptionBudget / household.getGlobals().nbGoods;
                 household.budget.clear();
-                for (int i = 0; i <= 2; i++) {
+                for (int i = 0; i < household.getGlobals().nbGoods; i++) {
                     household.budget.put(i, toSpend);
                 }
             }
