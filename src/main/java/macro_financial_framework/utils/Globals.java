@@ -17,7 +17,7 @@ public class Globals extends GlobalState {
     @Input(name = "Percentage Firms Micro-Small")
     public double percentMicroSmallFirms = 0.99;
 
-    @Input
+    @Input(name = "Number of Sectors")
     public int nbSectors = 3;
 
     @Input
