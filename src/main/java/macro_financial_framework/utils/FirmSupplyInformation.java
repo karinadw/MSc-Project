@@ -1,4 +1,4 @@
-package macro_financial_framework;
+package macro_financial_framework.utils;
 
 public class FirmSupplyInformation {
     public long ID;

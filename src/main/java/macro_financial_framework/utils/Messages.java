@@ -1,5 +1,6 @@
-package macro_financial_framework;
+package macro_financial_framework.utils;
 
+import macro_financial_framework.utils.HealthyFirmAccount;
 import simudyne.core.graph.Message;
 
 public class Messages {
