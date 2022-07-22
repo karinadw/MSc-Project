@@ -168,7 +168,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
 
-                for (int x = 0; x < vacancies; x++) {
+                while (vacancies > 0){
                     market.availableWorkers.sort(Comparator.comparing(worker -> worker.productivity));
                     Collections.reverse(market.availableWorkers);
                     Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();

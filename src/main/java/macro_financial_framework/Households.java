@@ -58,18 +58,13 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     }
 
     public static Action<Households> updateAvailability() {
-        return Action.create(Households.class,
-                worker -> {
-                    if (worker.hasMessageOfType(Messages.Hired.class)) {
-                        long firmID = worker.getMessageOfType(Messages.Hired.class).firmID;
-                        worker.addLink(firmID, Links.WorkerToFirmLink.class);
-//                        worker.send(Messages.Productivity.class, m -> {
-//                            m.productivity = worker.productivity;
-//                        }).to(firmID); //sends productivity to the firm its working for
-                        worker.status = Status.WORKER_EMPLOYED;
-                    }
-
-                });
+        return Action.create(Households.class, worker -> {
+            if (worker.hasMessageOfType(Messages.Hired.class)) {
+                long firmID = worker.getMessageOfType(Messages.Hired.class).firmID;
+                worker.addLink(firmID, Links.WorkerToFirmLink.class);
+                worker.status = Status.WORKER_EMPLOYED;
+            }
+        });
     }
 
     public static Action<Households> sendProductivity() {
@@ -148,11 +143,11 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
         });
     }
 
-    public static Action<Households> checkLengthOfUnemployment(){
+    public static Action<Households> checkLengthOfUnemployment() {
         return Action.create(Households.class, worker -> {
-           if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED || worker.status == Status.WORKER_UNEMPLOYED){
-               worker.lenOfUnemployment += 1;
-           }
+            if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED || worker.status == Status.WORKER_UNEMPLOYED) {
+                worker.lenOfUnemployment += 1;
+            }
         });
     }
 
@@ -175,7 +170,7 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Households> UnemployedWorkerCanApply() {
         return Action.create(Households.class, worker -> {
-            if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
+            if (worker.status == Status.WORKER_UNEMPLOYED_APPLIED) {
                 worker.status = Status.WORKER_UNEMPLOYED;
             }
         });
@@ -184,29 +179,29 @@ public class Households extends Agent<MacroFinancialModel.Globals> {
     public static Action<Households> UpgradeSkills() {
         return Action.create(Households.class, worker -> {
             // if the worker has been unemployed for a year or longer, the worker has a chance of upgrading its productivity
-           if (worker.lenOfUnemployment >= 12){
-               double diff = 1.00 - worker.productivity; // a worker can´t have a productivity higher than one
-               // there is a 50% chance of upgrading its skills
-               worker.productivity = worker.productivity + (worker.getPrng().getNextInt(2) * worker.getPrng().getNextDouble(diff));
-           }
+            if (worker.lenOfUnemployment >= 12) {
+                double diff = 1.00 - worker.productivity; // a worker can´t have a productivity higher than one
+                // there is a 50% chance of upgrading its skills
+                worker.productivity = worker.productivity + (worker.getPrng().getNextInt(2) * worker.getPrng().getNextDouble(diff));
+            }
         });
     }
 
     public static Action<Households> SendUnemployment() {
         return Action.create(Households.class, worker -> {
-           if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED){
-               worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class, (unemploymentMessage, linkToEconomy) -> {
-                   unemploymentMessage.sector = worker.sector_skills;
-               });
-           }
+            if (worker.status == Status.WORKER_UNEMPLOYED || worker.status == Status.WORKER_UNEMPLOYED_APPLIED) {
+                worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class, (unemploymentMessage, linkToEconomy) -> {
+                    unemploymentMessage.sector = worker.sector_skills;
+                });
+            }
         });
     }
 
     public static Action<Households> ReviveFirm() {
         return Action.create(Households.class, investor -> {
-           if (investor.hasMessageOfType(Messages.InvestorPaysRevival.class)){
-               investor.wealth -= investor.getMessageOfType(Messages.InvestorPaysRevival.class).debt;
-           }
+            if (investor.hasMessageOfType(Messages.InvestorPaysRevival.class)) {
+                investor.wealth -= investor.getMessageOfType(Messages.InvestorPaysRevival.class).debt;
+            }
         });
     }
 

@@ -50,6 +50,8 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         @Input(name = "mu")
         public double mu = 1.0;
+        @Input(name="gammaW")
+        public double gamma_w = 0.05d;
 
         @Input
         public int nbGoods = 21;
@@ -62,8 +64,20 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
         @Input(name="phi")
         public double phi = 0.1d;
 
+        @Input
         public double nbExclusiveGoods = 0.2d; // its a percentage
+        @Input
         public double percentageWealthyHouseholds = 0.1;
+        @Input
+        public long initialSaving = 302500;
+        @Input
+        public long initialSavingRich = 3600000;
+        @Input
+        public long initialDeposits = 10000;
+        @Input
+        public int deposistsMultiplier = 2;
+        public int totalVacancies;
+
     }
 
     @Override
@@ -87,6 +101,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
     int i = 0;
     int householdNumber = 0;
+    int firmNumber = 0;
 
     @Override
     public void setup() {
@@ -114,7 +129,19 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
 
         Group<Firms> FirmGroup = generateGroup(Firms.class, getGlobals().nbFirms, firm -> {
             firm.sector = firm.getPrng().getNextInt(getGlobals().nbSectors); // get next int creates a random variable until limit - 1, so with this range we get values from 0 to 20
-            firm.sizeOfCompany = firm.getPrng().getNextInt(3); //start-up: 0, medium-sized: 1, large company: 2
+
+            int largeCompanies = (int) Math.ceil(0.001 * getGlobals().nbFirms);
+            int mediumCompanies = (int) Math.ceil(0.01 * getGlobals().nbFirms);
+            int microSmallCompanies = (int) getGlobals().nbFirms - mediumCompanies - largeCompanies;
+
+            if (firmNumber < microSmallCompanies){
+                firm.sizeOfCompany = 0;
+            } else if (firmNumber >= microSmallCompanies && firmNumber < mediumCompanies){
+                firm.sizeOfCompany = 1;
+            } else {
+                firm.sizeOfCompany = 2;
+            }
+            firmNumber++;
         });
 
 
@@ -129,7 +156,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(getGlobals().percentageWealthyHouseholds * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
-                household.savings = household.getPrng().uniform(1000000.00, 2000000.00).sample();
+                household.savings = getGlobals().initialSaving;
                 double moneyToSpend = getGlobals().c * household.savings;
                 int exclusiveGoods = (int) Math.ceil(getGlobals().nbExclusiveGoods * getGlobals().nbGoods);
                 for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
@@ -138,7 +165,7 @@ public class MacroFinancialModel extends AgentBasedModel<MacroFinancialModel.Glo
             } else {
                 // wealthy individuals
                 household.rich = true;
-                household.savings = household.getPrng().uniform(200000.00, 400000.00).sample();
+                household.savings = getGlobals().initialSavingRich;
 
                 double moneyToSpend = getGlobals().c * household.savings;
                 // wealthy individuals spend on luxury goods as well

@@ -58,17 +58,20 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
             // set vacancies according to firm size
             // TODO: check if logic makes sense -> check the numbers
             // potential resources: https://www.statista.com/statistics/676671/employees-by-business-size-uk/
+            // Ive scaled it down because if not there are approx 25000 vacancies
             if (firm.isProductive) {
                 if (firm.sizeOfCompany == 0) {
-                    firm.vacancies = (int) firm.getPrng().uniform(1, 50).sample();
+                    firm.vacancies = (int) firm.getPrng().uniform(1, 5).sample();
                 } else if (firm.sizeOfCompany == 1) {
-                    firm.vacancies = (int) firm.getPrng().uniform(50, 1000).sample();
+                    firm.vacancies = (int) firm.getPrng().uniform(5, 25).sample();
                 } else {
-                    firm.vacancies = (int) firm.getPrng().uniform(1000, 5000).sample();
+                    firm.vacancies = (int) firm.getPrng().uniform(25, 100).sample();
                 }
             } else {
                 firm.vacancies = 0;
             }
+            //firm.getGlobals().totalVacancies += firm.vacancies;
+            //System.out.println(firm.getGlobals().totalVacancies);
         });
     }
 
@@ -96,6 +99,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
                     }
                 });
             }
+            firm.deposits = firm.getGlobals().deposistsMultiplier * firm.vacancies * firm.wage;
         });
     }
 
@@ -103,7 +107,7 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
         return Action.create(Firms.class, firm -> {
             //TODO: check how to make logical assumptions about pricing
             //TODO: price of non competitive goods should be higher
-            double price = firm.getPrng().uniform(10.00, 50.00).sample();
+            double price = firm.getPrng().uniform(1.00, 10.00).sample();
             firm.priceOfGoods = price;
         });
     }
@@ -422,11 +426,18 @@ public class Firms extends Agent<MacroFinancialModel.Globals> {
     public static Action<Firms> adjustPriceProduction() {
         return Action.create(Firms.class, firm -> {
             if (firm.previousOutput > firm.demand) {
+                if (firm.profit < 0){
+                    firm.wage = firm.wage * (1.0d - firm.getGlobals().gamma_w * firm.availableWorkers * firm.getPrng().uniform(0, 1).sample());
+                }
                 firm.targetProduction = firm.previousOutput + Math.min(firm.getGlobals().etta_plus * (firm.demand - firm.previousOutput), firm.getGlobals().mu * firm.availableWorkers);
                 if (firm.priceOfGoods < firm.averagePrice) {
                     firm.priceOfGoods = firm.priceOfGoods * (1.0d + firm.getGlobals().gamma_p * firm.getPrng().uniform(0, 1).sample());
                 }
             } else if (firm.previousOutput < firm.demand) {
+                if (firm.profit > 0){
+                    firm.wage = Math.min(firm.wage, (firm.priceOfGoods * Math.min(firm.demand, firm.previousOutput))/firm.previousOutput);
+                    firm.wage = firm.wage * (1.0d + firm.getGlobals().gamma_w * firm.availableWorkers * firm.getPrng().uniform(0, 1).sample());
+                }
                 firm.targetProduction = Math.max(0.0d, firm.previousOutput - (firm.getGlobals().etta_minus * (firm.previousOutput - firm.demand)));
                 if (firm.priceOfGoods > firm.averagePrice) {
                     firm.priceOfGoods = firm.priceOfGoods * (1.0d - firm.getGlobals().gamma_p * firm.getPrng().uniform(0, 1).sample());
