@@ -1,14 +1,16 @@
-package macro_financial_framework;
+package macro_financial_framework.agents;
 
 //import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
 
+import macro_financial_framework.*;
+import macro_financial_framework.utils.*;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.*;
 
-public class Economy extends Agent<MacroFinancialModel.Globals> {
+public class Economy extends Agent<Globals> {
 
     public List<WorkerID> availableWorkers;
     public List<FirmID> firmsHiring;
@@ -36,6 +38,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
 
     public static Action<Economy> AssignInvestorToFirm() {
         return Action.create(Economy.class, market -> {
+
             List<Long> allHouseholds = new ArrayList<Long>();
             market.getMessagesOfType(Messages.ApplyForInvestor.class).forEach(msg -> {
                 allHouseholds.add(msg.getSender());
@@ -45,6 +48,9 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             market.getMessagesOfType(Messages.FindInvestor.class).forEach(msg -> {
                 allFirms.add(msg.getSender());
             });
+
+            Collections.shuffle(allHouseholds, market.getPrng().getRandom());
+            Collections.shuffle(allFirms, market.getPrng().getRandom());
 
             for (int i = 0; i < allFirms.size(); i++) {
                 long investorID = allHouseholds.get(i);
@@ -74,8 +80,8 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
             int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
             for (int i = 0; i < numberOfSectors; i++) {
                 int sector = i;
-                // TODO: check if the numbers for the wages makes sense
-                double wage = market.getPrng().uniform(2000.00, 4000.00).sample();
+                // TODO: Wages should be relative to production / price of goods - check if the numbers for the wages makes sense
+                double wage = market.getPrng().uniform(20.00, 40.00).sample();
                 sectorWages.put(sector, wage);
                 // int good = market.getPrng().getNextInt(numberOfGoods);
                 int good = sector;
@@ -168,7 +174,7 @@ public class Economy extends Agent<MacroFinancialModel.Globals> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
 
-                while (vacancies > 0){
+                while (vacancies > 0) {
                     market.availableWorkers.sort(Comparator.comparing(worker -> worker.productivity));
                     Collections.reverse(market.availableWorkers);
                     Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();

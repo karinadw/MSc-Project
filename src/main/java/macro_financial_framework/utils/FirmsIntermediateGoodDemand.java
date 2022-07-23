@@ -1,4 +1,4 @@
-package macro_financial_framework;
+package macro_financial_framework.utils;
 
 public class FirmsIntermediateGoodDemand {
     public long ID;

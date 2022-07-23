@@ -17,26 +17,25 @@ public class MainNoConsole {
             RunnerBackend runnerBackend = RunnerBackend.create();
             ModelRunner modelRunner = runnerBackend.forModel(MacroFinancialModel.class);
 
-            Map<String, String> _config;
-            Map<String, Object> _input;
-            if(args.length == 2) {
-                _config = getConfigMap(args[0]);
-                _input = getMap(args[1]);
-            }
-            else {
-                // Default config and input parameters
-                _config = getConfigMap("simudyne.core.export-path=output");
-                _input = getMap("I=2,H=1000,alpha=1000,w=1000");
-            }
+//            Map<String, String> _config;
+//            Map<String, Object> _input;
+//            if(args.length == 2) {
+//                _config = getConfigMap(args[0]);
+//                _input = getMap(args[1]);
+//            }
+//            else {
+//                // Default config and input parameters
+//                _config = getConfigMap("simudyne.core.export-path=output");
+//                _input = getMap("I=2,H=1000,alpha=1000,w=1000");
+//            }
 
             String _seed = System.getProperty("seed", "123");
             String _runs = System.getProperty("runs", "1");
-            String _ticks = System.getProperty("ticks", "12");
+            String _ticks = System.getProperty("ticks", "10");
             long seed = Long.parseLong(_seed);
             int n_runs = Integer.parseInt(_runs);
 
             long n_ticks = Long.parseLong(_ticks);
-            _input.put("nSteps", n_ticks);
 
             long startTime = System.currentTimeMillis();
 
@@ -44,12 +43,10 @@ public class MainNoConsole {
                     BatchDefinitionsBuilder.create()
                             .forRuns(n_runs)
                             .forTicks(n_ticks)
-                            .forSeeds(seed)
-                            .withInputs(_input);
-
+                            .forSeeds(seed);
             logger.warn("Simulation Starting...");
-            modelRunner.forRunDefinitionBuilder(runDefinitionBuilder).withConfigMap(_config);
-            modelRunner.run().awaitOutput();
+            modelRunner.forRunDefinitionBuilder(runDefinitionBuilder);
+            modelRunner.run();
 
             logger.warn("Simulation Complete.");
 

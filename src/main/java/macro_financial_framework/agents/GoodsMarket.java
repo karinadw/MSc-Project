@@ -1,6 +1,7 @@
-package macro_financial_framework;
+package macro_financial_framework.agents;
 
-import org.apache.hadoop.io.Text;
+import macro_financial_framework.*;
+import macro_financial_framework.utils.*;
 import simudyne.core.abm.Agent;
 import simudyne.core.abm.Action;
 
@@ -9,7 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-public class GoodsMarket extends Agent<MacroFinancialModel.Globals> {
+public class GoodsMarket extends Agent<Globals> {
 
     public int goodTraded;
     public boolean competitive;
