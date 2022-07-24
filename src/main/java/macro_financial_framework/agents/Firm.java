@@ -3,7 +3,6 @@ package macro_financial_framework.agents;
 import macro_financial_framework.utils.Globals;
 import macro_financial_framework.utils.HealthyFirmAccount;
 import macro_financial_framework.utils.Links;
-import macro_financial_framework.MacroFinancialModel;
 import macro_financial_framework.utils.Messages;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
@@ -27,6 +26,7 @@ public class Firm extends Agent<Globals> {
     @Variable
     public double wage;
     public double priceOfGoods;
+    public double previousPrice;
     @Variable
     public double productivity;
     @Variable
@@ -58,6 +58,9 @@ public class Firm extends Agent<Globals> {
     public boolean isProductive;
     public double debt;
     public int totalUnemployment;
+
+    //TODO: check this
+    public int productionConstant = 30;
 
     public static Action<Firm> SetVacancies() {
         return Action.create(Firm.class, firm -> {
@@ -92,23 +95,30 @@ public class Firm extends Agent<Globals> {
         });
     }
 
-    public static Action<Firm> SetSectorSpecifics() {
+//    public static Action<Firm> SetSectorSpecifics() {
+//        return Action.create(Firm.class, firm -> {
+//            if (firm.hasMessageOfType(Messages.FirmProperties.class)) {
+//                firm.getMessagesOfType(Messages.FirmProperties.class).forEach(msg -> {
+//                    firm.good = msg.good;
+//                    firm.intermediateGood = msg.goodToPurchase;
+//                    //TODO: check if this makes sense
+//                    if (firm.sizeOfCompany == 0) {
+//                        firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
+//                    } else if (firm.sizeOfCompany == 1) {
+//                        firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium-sized companies pay a wage that can be slightly lower or higher than average
+//                    } else {
+//                        firm.wage = msg.wage + firm.getPrng().uniform(100.00, 200.00).sample(); // big companies pay a wage that is higher than the average for the sector
+//                    }
+//                });
+//            }
+//            firm.deposits = firm.getGlobals().deposistsMultiplier * firm.vacancies * firm.wage;
+//        });
+//    }
+
+    public static Action<Firm> SetSectorSpecificGoods() {
         return Action.create(Firm.class, firm -> {
-            if (firm.hasMessageOfType(Messages.FirmProperties.class)) {
-                firm.getMessagesOfType(Messages.FirmProperties.class).forEach(msg -> {
-                    firm.good = msg.good;
-                    firm.intermediateGood = msg.goodToPurchase;
-                    //TODO: check if this makes sense
-                    if (firm.sizeOfCompany == 0) {
-                        firm.wage = msg.wage + firm.getPrng().uniform(-200.00, -100.00).sample(); // smaller companies pay a wage smaller than the average wage for that sector
-                    } else if (firm.sizeOfCompany == 1) {
-                        firm.wage = msg.wage + firm.getPrng().uniform(-100.00, 100.00).sample(); // medium-sized companies pay a wage that can be slightly lower or higher than average
-                    } else {
-                        firm.wage = msg.wage + firm.getPrng().uniform(100.00, 200.00).sample(); // big companies pay a wage that is higher than the average for the sector
-                    }
-                });
-            }
-            firm.deposits = firm.getGlobals().deposistsMultiplier * firm.vacancies * firm.wage;
+            firm.good = firm.sector;
+            firm.intermediateGood = (firm.sector + 1) % firm.getGlobals().nbGoods;
         });
     }
 
@@ -116,8 +126,9 @@ public class Firm extends Agent<Globals> {
         return Action.create(Firm.class, firm -> {
             //TODO: check how to make logical assumptions about pricing
             //TODO: price of non competitive goods should be higher
-            double price = firm.getPrng().uniform(1.00, 10.00).sample();
+            double price = firm.getPrng().uniform(1.00, 100.00).sample();
             firm.priceOfGoods = price;
+            firm.priceOfIntermediateGood = price / 2;
         });
     }
 
@@ -140,7 +151,7 @@ public class Firm extends Agent<Globals> {
         });
     }
 
-    public static Action<Firm> sendVacancies() {
+    public static Action<Firm> sendInfo() {
         // send vacancies of the firm
         return Action.create(Firm.class, firm -> {
             // al firms are hiring at the beggining
@@ -166,13 +177,22 @@ public class Firm extends Agent<Globals> {
         });
     }
 
+    public static Action<Firm> SetWages() {
+        return Action.create(Firm.class, firm -> {
+            // TODO: check this. Right now 50% of sales is the wage and the rest is profit
+            double maxSales = Math.floor(firm.productivity * firm.workers) * firm.priceOfGoods * firm.productionConstant;
+            double maxSalesIntGoods = Math.floor(firm.productivity * firm.workers) * (firm.priceOfIntermediateGood) * firm.productionConstant;
+            double totalMaxSales = maxSales + maxSalesIntGoods;
+            firm.wage = totalMaxSales / (firm.workers * 2);
+        });
+    }
 
     public static Action<Firm> CalculateFirmProductivity() {
         return Action.create(Firm.class, firm -> {
 
+            firm.productivity = 0;
             // productivity is set to 0 by default
             if (firm.hasMessageOfType(Messages.Productivity.class)) {
-                firm.productivity = 0;
                 firm.getMessagesOfType(Messages.Productivity.class).forEach(msg -> {
                     firm.productivity += msg.productivity;
                 });
@@ -186,7 +206,7 @@ public class Firm extends Agent<Globals> {
         return Action.create(Firm.class, firm -> {
             // depending on the size of the firm -> workers can produce more or less goods
             // this is assuming that larger companies have more facilities
-            //TODO: check if this is a fair assumption
+            //TODO: check if this is a fair assumption -> I really need to check how to deal with intermediate goods
             // this means it has enough intermediate goods for production
             if (firm.isProductive) {
                 if (firm.workers <= firm.stockOfIntermediateGood) {
@@ -203,7 +223,9 @@ public class Firm extends Agent<Globals> {
                     firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
                     firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
                 }
-                firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant);
+                firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant) * firm.productionConstant;
+
+                // TODO: check this -> it produces the same amount of intermediate goods as actual goods?
                 firm.intermediateGoodQuantityProduced = firm.stock;
             } else {
                 firm.stock = 0;
@@ -273,9 +295,9 @@ public class Firm extends Agent<Globals> {
             // I am storing how much the firm produced, as when the selling occurs the stock will go down
             // needed for various metrics and calculations
             firm.previousOutput = firm.stock;
+            firm.demand = 0;
 
             if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
-                firm.demand = 0;
                 firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(purchaseMessage -> {
                     firm.demand += purchaseMessage.demand;
                     firm.stock -= purchaseMessage.bought;
@@ -413,9 +435,8 @@ public class Firm extends Agent<Globals> {
         return Action.create(Firm.class, firm -> {
             if (firm.hasMessageOfType(Messages.AvailableWorkersInYourSector.class)) {
                 firm.getMessagesOfType(Messages.AvailableWorkersInYourSector.class).forEach(msg -> {
-                            firm.availableWorkers = msg.workers;
-                        }
-                );
+                    firm.availableWorkers = msg.workers;
+                });
             }
             if (firm.hasMessageOfType(Messages.CurrentUnemployment.class)) {
                 firm.getMessagesOfType(Messages.CurrentUnemployment.class).forEach(msg -> {
@@ -427,7 +448,8 @@ public class Firm extends Agent<Globals> {
 
     public static Action<Firm> sendPrice() {
         return Action.create(Firm.class, firm -> {
-            if (firm.previousOutput > 0) {
+            // at this point I havent set the stock to 0
+            if (firm.stock > 0) {
                 firm.getLinks(Links.FirmToEconomyLink.class).send(Messages.FirmsPrice.class, (m, l) -> {
                     m.price = firm.priceOfGoods;
                     m.output = firm.stock;
@@ -463,13 +485,23 @@ public class Firm extends Agent<Globals> {
 
     public static Action<Firm> UpdateVacancies() {
         return Action.create(Firm.class, firm -> {
-            int targetWorkers = (int) Math.ceil(firm.targetProduction); //assuming a one to one relationship
+            // all are set to true before the conditions are checked
+            firm.isHiring = true;
+            int targetWorkers = (int) Math.ceil(firm.targetProduction/ firm.productionConstant); //assuming a one to one relationship
+            System.out.println("Firm " + firm.getID() + " target workers: " + targetWorkers + " current workers " + firm.workers);
             if (targetWorkers > firm.workers) {
                 firm.vacancies = targetWorkers - firm.workers;
+                System.out.println("condition 1");
+            } else if (targetWorkers == firm.workers) {
+                firm.vacancies = 0;
+                firm.isHiring = false;
+                firm.workersToBeFired = 0;
+                System.out.println("condition 2");
             } else if (targetWorkers < firm.workers) {
                 firm.isHiring = false;
                 firm.vacancies = 0;
                 firm.workersToBeFired = Math.abs(firm.workers - targetWorkers);
+                System.out.println("condition 3" + " workers to be fired " + firm.workersToBeFired);
             }
         });
     }
@@ -485,14 +517,7 @@ public class Firm extends Agent<Globals> {
                 });
             }
 
-            if (!firm.isHiring) {
-                // if it wants to fire all the workers the firm sends a message to all its employees
-                // reducing computational complexity by doing it this way
-//                if (firm.workersToBeFired == firm.workers) {
-//                    firm.getLinks(Links.FirmToWorkerLink.class).send(Messages.Fired.class);
-//                    firm.removeLinks(Links.FirmToWorkerLink.class);
-//                    firm.workers = 0;
-//                } else {
+            if (!firm.isHiring && firm.workersToBeFired > 0) {
                 int firedWorkers = 0;
                 if (workers.size() < firm.workersToBeFired) {
                     System.out.println("firm " + firm.getID() + " has " + workers.size() + " workers and needs to fire " + firm.workersToBeFired);

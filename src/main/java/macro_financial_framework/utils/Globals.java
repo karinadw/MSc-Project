@@ -15,13 +15,13 @@ public class Globals extends GlobalState {
     public long nbWorkers = 1000;
 
     @Input(name = "Percentage Firms Micro-Small")
-    public double percentMicroSmallFirms = 0.99;
+    public double percentMicroSmallFirms = 0.95;
 
     @Input(name = "Number of Sectors")
-    public int nbSectors = 3;
+    public int nbSectors = 21;
 
     @Input
-    public double c = 0.010d; // this is for calculating the consumption budget
+    public double c = 0.2d; // this is for calculating the consumption budget
 
     @Input
     //TODO: refactor this as I have named the productivity of a firm alpha
@@ -49,7 +49,7 @@ public class Globals extends GlobalState {
     public double gamma_w = 0.05d;
 
     @Input
-    public int nbGoods = 21;
+    public int nbGoods = nbSectors;
 
     public HashMap<Integer, Long> goodExchangeIDs;
 
@@ -62,11 +62,11 @@ public class Globals extends GlobalState {
     @Input
     public double nbExclusiveGoods = 0.2d; // its a percentage
     @Input
-    public double percentageWealthyHouseholds = 0.1;
+    public double percentageWealthyHouseholds = 0.01;
     @Input
-    public long initialSaving = 302500;
+    public long initialSaving = 10000;
     @Input
-    public long initialSavingRich = 3600000;
+    public long initialSavingRich = 35000;
     @Input
     public long initialDeposits = 10000;
     @Input

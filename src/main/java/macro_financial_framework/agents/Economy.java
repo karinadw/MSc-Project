@@ -124,6 +124,7 @@ public class Economy extends Agent<Globals> {
 
     public static Action<Economy> GetPrices() {
         return Action.create(Economy.class, market -> {
+            market.priceOfGoods.clear();
             market.getMessagesOfType(Messages.FirmsPrice.class).forEach(priceMessage -> {
                 market.priceOfGoods.put(priceMessage.price, priceMessage.output);
             });
@@ -132,17 +133,23 @@ public class Economy extends Agent<Globals> {
 
     public static Action<Economy> CalculateAndSendAveragePrice() {
         return Action.create(Economy.class, market -> {
+            market.numerator = 0;
+            market.denominator = 0;
             market.priceOfGoods.forEach((price, output) -> {
                 market.numerator += (price * output);
                 market.denominator += output;
             });
 
+//            System.out.println("numerator " + market.numerator + "denominator " + market.denominator);
+
             // stores the previous average price to calculate inflation
             market.previousAveragePrice = market.averagePrice;
+//            System.out.println("previous average price " + market.averagePrice);
 //            System.out.println("average price " + market.averagePrice + " previous average price " + market.previousAveragePrice);
 
             // new average price
             market.averagePrice = market.numerator / market.denominator;
+//            System.out.println("previous average price " + market.previousAveragePrice + " current average price " + market.averagePrice);
             market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class,  (m, l) -> {
                 m.averagePrice = market.averagePrice;
             });
@@ -206,16 +213,20 @@ public class Economy extends Agent<Globals> {
 
     public static Action<Economy> calculateUnemploymentAndAavailableWorkers() {
         return Action.create(Economy.class, market -> {
+
+            market.unemployment = 0;
             if (market.hasMessageOfType(Messages.Unemployed.class)) {
                 market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->
                         market.unemployment += 1);
             }
 
-            // send the current unemployment to the firms -> available workers
+            // send the current unemployment to the firms
             market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
                 unemploymentMessage.unemployment = market.unemployment;
             });
 
+
+            market.availableWorkers.clear();
             HashMap<Long, Integer> availableWorkers = new HashMap<Long, Integer>();
             if (market.hasMessageOfType(Messages.Unemployed.class)) {
                 market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->

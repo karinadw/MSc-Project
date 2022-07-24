@@ -98,7 +98,6 @@ public class Household extends Agent<Globals> {
                         m.consumptionBudget = budget;
                     }).to(worker.getGlobals().goodExchangeIDs.get(good));
                 }
-                worker.consumptionBudget += budget;
             });
         });
     }

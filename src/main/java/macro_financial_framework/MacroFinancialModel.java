@@ -5,10 +5,8 @@ import macro_financial_framework.utils.Globals;
 import macro_financial_framework.utils.HealthyFirmAccount;
 import macro_financial_framework.utils.Links;
 import simudyne.core.abm.AgentBasedModel;
-import simudyne.core.abm.GlobalState;
 import simudyne.core.abm.Group;
 import simudyne.core.abm.Split;
-import simudyne.core.annotations.Input;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +40,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
     int i = 0;
     int householdNumber = 0;
     int firmNumber = 0;
+    int householdRich = 0;
 
 
     @Override
@@ -82,7 +81,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
             // reference for number used for saving -> initial wealth: https://www.ons.gov.uk/peoplepopulationandcommunity/personalandhouseholdfinances/incomeandwealth/bulletins/distributionofindividualtotalwealthbycharacteristicingreatbritain/april2018tomarch2020
             household.budget = new HashMap<Integer, Double>();
 
-            // TODO: Check the variables here : percetange of rich households and percentage of exclusive goods
+            // TODO: Check the variables here : percentage of rich households and percentage of exclusive goods
             if (householdNumber < (getGlobals().nbWorkers - Math.ceil(getGlobals().percentageWealthyHouseholds * getGlobals().nbWorkers))) {
                 // common individuals
                 household.rich = false;
@@ -95,7 +94,9 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
             } else {
                 // wealthy individuals
                 household.rich = true;
+                householdRich++;
                 household.wealth = getGlobals().initialSavingRich;
+
 
                 double moneyToSpend = getGlobals().c * household.wealth;
                 // wealthy individuals spend on luxury goods as well
@@ -149,8 +150,8 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
             run(Firm.SetInitialStockOfIntermediateGoods());
 
             // set sector specific wages and sector specific pricing of goods
-            //TODO: check if the good traded needs to be sector specific
-            run(Firm.sendVacancies(), Economy.SetFirmProperties(), Firm.SetSectorSpecifics());
+//            run(Firm.sendInfo(), Economy.SetFirmProperties(), Firm.SetSectorSpecifics());
+            run(Firm.SetSectorSpecificGoods());
 
             // dividing households into investors and workers
             run(
@@ -172,7 +173,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
                         // if the worker is unemployed, the worker applies for a job. Received by the economy
                         Household.applyForJob(),
                         // if the firm is hiring, vacancies are sent to the economy
-                        Firm.sendVacancies()
+                        Firm.sendInfo()
                 ),
                 Economy.MatchFirmsAndWorkers(),
                 Split.create(
@@ -188,11 +189,12 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
         // the productivity of the firm is dependant on the productivity of the workers
         run(Household.sendProductivity(), Firm.CalculateFirmProductivity());
 
+        run(Firm.SetWages());
 
         // Firms produce their good according to the productivity of the firm, the number of workers and the size of the firm
         run(Firm.FirmsProduce());
 
-//        run(Firms.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firms.receiveIntermediateGoodsAndDemand());
+        run(Firm.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firm.receiveIntermediateGoodsAndDemand());
 
         // calculates the average price of products and sends it to the firms
         // this is needed for the firm to update its strategy
