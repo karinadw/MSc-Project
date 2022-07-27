@@ -15,10 +15,17 @@ public class Globals extends GlobalState {
     public long nbWorkers = 1000;
 
     @Input(name = "Percentage Firms Micro-Small")
-    public double percentMicroSmallFirms = 0.95;
+    public double percentMicroFirms = 0.90;
+
+    @Input(name = "Percentage Firms Micro-Small")
+    public double percentSmallFirms = 0.02;
 
     @Input(name = "Number of Sectors")
-    public int nbSectors = 21;
+    public int nbSectors = 10;
+
+    //TODO: check this
+    @Input(name = "Multiplier for production")
+    public int productionConstant = 30;
 
     @Input
     public double c = 0.2d; // this is for calculating the consumption budget
@@ -71,7 +78,9 @@ public class Globals extends GlobalState {
     public long initialDeposits = 10000;
     @Input
     public int deposistsMultiplier = 2;
-    public int totalVacancies;
+
+    public double[][] weightsArray;
+
 
 }
 

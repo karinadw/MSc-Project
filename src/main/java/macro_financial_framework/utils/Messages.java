@@ -1,6 +1,5 @@
 package macro_financial_framework.utils;
 
-import macro_financial_framework.utils.HealthyFirmAccount;
 import simudyne.core.graph.Message;
 
 public class Messages {
@@ -68,7 +67,7 @@ public class Messages {
         public double consumptionBudget;
     }
 
-    public static class HouseholdWantsToPurchase extends Message {
+    public static class HouseholdOrFirmWantsToPurchase extends Message {
         public long bought ;
         public int demand;
     }
@@ -136,6 +135,8 @@ public class Messages {
     public static class IntermediateGoodBought extends Message {
         public int quantity;
         public double spent;
+
+        public int good;
     }
 
     public static class DemandOfIntermediateGood extends Message {

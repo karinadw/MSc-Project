@@ -9,6 +9,7 @@ import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Firm extends Agent<Globals> {
 
@@ -26,7 +27,6 @@ public class Firm extends Agent<Globals> {
     @Variable
     public double wage;
     public double priceOfGoods;
-    public double previousPrice;
     @Variable
     public double productivity;
     @Variable
@@ -43,24 +43,25 @@ public class Firm extends Agent<Globals> {
     public double previousOutput;
     public double targetProduction;
     public int good;
-    public double deposits = 100000;
+    @Variable
+    public double deposits;
     public int availableWorkers;
     public double averagePrice;
     public boolean isHiring;
     public int workersToBeFired;
-    public int intermediateGood; // the intermediate good it needs for production of its own good, i.e. good 0
-    public int stockOfIntermediateGood; // how much of that good it has
+    public int stockOfIntermediateGoodprev; // how much of that good it has
     public double intermediateGoodConstant;
     public long intermediateGoodQuantityProduced; // intermediate good produced for other firms
     public double priceOfIntermediateGood;
     public double spentOnIntermediateGoods;
     public boolean healthy;
     public boolean isProductive;
-    public double debt;
     public int totalUnemployment;
+    public HashMap<Integer, Double> stockOfIntermediateGood;
+    public HashMap<Integer, Double> IntermediateGoodNeeded;
+    public double totalStockOfIntGood;
 
-    //TODO: check this
-    public int productionConstant = 30;
+    public boolean needsIntermediateGoods = false;
 
     public static Action<Firm> SetVacancies() {
         return Action.create(Firm.class, firm -> {
@@ -74,24 +75,27 @@ public class Firm extends Agent<Globals> {
                 if (firm.sizeOfCompany == 0) {
                     firm.vacancies = (int) firm.getPrng().uniform(1, 10).sample();
                 } else if (firm.sizeOfCompany == 1) {
-                    firm.vacancies = (int) firm.getPrng().uniform(10, 100).sample();
+                    firm.vacancies = (int) firm.getPrng().uniform(10, 50).sample();
                 } else {
                     firm.vacancies = (int) firm.getPrng().uniform(100, 1000).sample();
                 }
             } else {
                 firm.vacancies = 0;
             }
-            System.out.println("Firm " + firm.getID() + " is of size " + firm.sizeOfCompany + " and has " + firm.vacancies + " vacancies");
-            //firm.getGlobals().totalVacancies += firm.vacancies;
-            //System.out.println(firm.getGlobals().totalVacancies);
         });
     }
 
     public static Action<Firm> SetInitialStockOfIntermediateGoods() {
         return Action.create(Firm.class, firm -> {
-            // I am assuming a one on one relationship, for one unit of good, one intermediate good is needed
-            // Ideally, a firm will have 100% productivity so target output would be the initial vacancies * 100% productivity = initial stock of intermediate goods
-            firm.stockOfIntermediateGood = firm.vacancies;
+
+            // enough intermediate goods for two sets of production based on the vacancies of the firm
+
+            int predOutput = firm.vacancies * 2;
+            for (int i = 0; i < firm.getGlobals().nbGoods; i++){
+//                 // for debugging purposes
+//                System.out.println(firm.getGlobals().weightsArray[firm.sector][i]);
+                firm.stockOfIntermediateGood.put(i, firm.getGlobals().weightsArray[firm.sector][i] * predOutput);
+            }
         });
     }
 
@@ -118,7 +122,8 @@ public class Firm extends Agent<Globals> {
     public static Action<Firm> SetSectorSpecificGoods() {
         return Action.create(Firm.class, firm -> {
             firm.good = firm.sector;
-            firm.intermediateGood = (firm.sector + 1) % firm.getGlobals().nbGoods;
+//            firm.intermediateGood = (firm.sector + 1) % firm.getGlobals().nbGoods;
+            firm.deposits = firm.getGlobals().deposistsMultiplier * firm.vacancies * firm.wage;
         });
     }
 
@@ -128,7 +133,6 @@ public class Firm extends Agent<Globals> {
             //TODO: price of non competitive goods should be higher
             double price = firm.getPrng().uniform(1.00, 100.00).sample();
             firm.priceOfGoods = price;
-            firm.priceOfIntermediateGood = price / 2;
         });
     }
 
@@ -180,10 +184,10 @@ public class Firm extends Agent<Globals> {
     public static Action<Firm> SetWages() {
         return Action.create(Firm.class, firm -> {
             // TODO: check this. Right now 50% of sales is the wage and the rest is profit
-            double maxSales = Math.floor(firm.productivity * firm.workers) * firm.priceOfGoods * firm.productionConstant;
-            double maxSalesIntGoods = Math.floor(firm.productivity * firm.workers) * (firm.priceOfIntermediateGood) * firm.productionConstant;
+            double maxSales = Math.floor(firm.productivity * firm.workers) * firm.priceOfGoods * firm.getGlobals().productionConstant;
+            double maxSalesIntGoods = Math.floor(firm.productivity * firm.workers) * (firm.priceOfIntermediateGood) * firm.getGlobals().productionConstant;
             double totalMaxSales = maxSales + maxSalesIntGoods;
-            firm.wage = totalMaxSales / (firm.workers * 2);
+            firm.wage = totalMaxSales / (firm.workers * 10);
         });
     }
 
@@ -209,56 +213,79 @@ public class Firm extends Agent<Globals> {
             //TODO: check if this is a fair assumption -> I really need to check how to deal with intermediate goods
             // this means it has enough intermediate goods for production
             if (firm.isProductive) {
-                if (firm.workers <= firm.stockOfIntermediateGood) {
-                    firm.intermediateGoodConstant = 1.00d;
-                    firm.stockOfIntermediateGood -= firm.workers;
+                firm.stockOfIntermediateGood.forEach((good, quantity) -> {
+                    firm.totalStockOfIntGood += quantity;
+                });
 
-                    // if the firm doesn't have any intermediate good it can't produce
-                } else if (firm.stockOfIntermediateGood == 0) {
-                    firm.intermediateGoodConstant = 0.00d;
-
-                    // the workers a firm has is the maximum amount of goods it can produce
-                    // to produce all of the goods it needs the same amount of workers as intermediate goods
-                } else if (firm.stockOfIntermediateGood < firm.workers) {
-                    firm.intermediateGoodConstant = firm.stockOfIntermediateGood / firm.workers;
-                    firm.stockOfIntermediateGood = 0; // if it has less it will use all of it for production
+                if (firm.totalStockOfIntGood < 1.00d) {
+                    firm.intermediateGoodConstant = 0;
+                } else {
+                    firm.intermediateGoodConstant = 1;
                 }
-                firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant) * firm.productionConstant;
 
-                // TODO: check this -> it produces the same amount of intermediate goods as actual goods?
-                firm.intermediateGoodQuantityProduced = firm.stock;
+                List<Integer> ProductionFromIntGoods = new ArrayList<Integer>();
+                firm.stockOfIntermediateGood.forEach((good, quantity) -> {
+                    ProductionFromIntGoods.add((int) Math.floor(quantity / firm.getGlobals().weightsArray[firm.sector][good]));
+                });
+
+                int minProduction = ProductionFromIntGoods.stream().sorted().collect(Collectors.toList()).stream().findFirst().get() * firm.getGlobals().productionConstant;
+
+                firm.stock = (long) Math.floor(firm.productivity * firm.workers * firm.intermediateGoodConstant) * firm.getGlobals().productionConstant;
+
+                if (minProduction < firm.stock){
+                    // it can't produce what it intended it because it doesn't have enough intermediate goods
+                    // in this condition it means that its used all of the intermediate goods for production
+                    firm.stock = minProduction;
+                    firm.stockOfIntermediateGood.forEach((good, quantity) -> {
+                        quantity = Double.valueOf(0);
+                    });
+                }
             } else {
                 firm.stock = 0;
-                firm.intermediateGoodQuantityProduced = 0;
             }
-            //TODO: check if this is a valid assumption
-            firm.priceOfIntermediateGood = firm.priceOfGoods / 2;
+            // update consumption of intermediate goods from what is used in production
+            int consumed = (int) (firm.stock / firm.getGlobals().productionConstant);
+            firm.stockOfIntermediateGood.forEach((good, quantity) -> {
+                quantity -= (consumed * firm.getGlobals().weightsArray[firm.sector][good]);
+            });
         });
     }
 
-    public static Action<Firm> SendIntermediateGoodInfo() {
-        return Action.create(Firm.class, firm -> {
-            // sends the message of the good it is producing as intermediate good
-            firm.send(Messages.StockOfIntermediateGood.class, message -> {
-                message.price = firm.priceOfIntermediateGood;
-                message.stock = firm.intermediateGoodQuantityProduced;
-            }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
-
-
-            firm.send(Messages.PurchaseIntermediateGood.class, m -> {
-                m.demand = firm.workers - firm.stockOfIntermediateGood;
-            }).to(firm.getGlobals().goodExchangeIDs.get(firm.intermediateGood));
-
-        });
-    }
+//    public static Action<Firm> SendIntermediateGoodInfo() {
+//        return Action.create(Firm.class, firm -> {
+//
+//            // calculate how much intermediate good it needs for target production
+//            if (firm.needsIntermediateGoods) {
+//                firm.IntermediateGoodNeeded.forEach((good, quantity) -> {
+//                    firm.send(Messages.PurchaseIntermediateGood.class, m -> {
+//                        m.demand = (int) Math.ceil(quantity);
+//                    }).to(firm.getGlobals().goodExchangeIDs.get(good));
+//                });
+//                firm.IntermediateGoodNeeded.clear();
+//            }
+//        });
+//    }
 
     // TODO: sell the inventory first
-    public static Action<Firm> sendSupply() {
+    public static Action<Firm> sendSupplyAndDemand() {
         return Action.create(Firm.class, firm -> {
+
+            // send information about the stock of the good it produces and the price of the good
             firm.send(Messages.FirmSupply.class, m -> {
                 m.output = firm.stock;
                 m.price = firm.priceOfGoods;
             }).to(firm.getGlobals().goodExchangeIDs.get(firm.good));
+
+            // calculate how much intermediate good it needs for target production
+            // sends the demand of intermediate good
+            if (firm.needsIntermediateGoods) {
+                firm.IntermediateGoodNeeded.forEach((good, quantity) -> {
+                    firm.send(Messages.PurchaseIntermediateGood.class, m -> {
+                        m.demand = (int) Math.ceil(quantity);
+                    }).to(firm.getGlobals().goodExchangeIDs.get(good));
+                });
+                firm.IntermediateGoodNeeded.clear();
+            }
         });
     }
 
@@ -268,7 +295,7 @@ public class Firm extends Agent<Globals> {
             // receive the intermediate good needed for production
             if (firm.hasMessageOfType(Messages.IntermediateGoodBought.class)) {
                 firm.getMessagesOfType(Messages.IntermediateGoodBought.class).forEach(message -> {
-                    firm.stockOfIntermediateGood += message.quantity;
+                    firm.stockOfIntermediateGoodprev += message.quantity;
                     firm.spentOnIntermediateGoods = message.spent;
                 });
             }
@@ -288,7 +315,7 @@ public class Firm extends Agent<Globals> {
         });
     }
 
-    public static Action<Firm> receiveDemand() {
+    public static Action<Firm> receiveDemandAndIntermediateGoods() {
         return Action.create(Firm.class, firm -> {
 
             // the initial stock of the product of that firm
@@ -297,18 +324,27 @@ public class Firm extends Agent<Globals> {
             firm.previousOutput = firm.stock;
             firm.demand = 0;
 
-            if (firm.hasMessageOfType(Messages.HouseholdWantsToPurchase.class)) {
-                firm.getMessagesOfType(Messages.HouseholdWantsToPurchase.class).forEach(purchaseMessage -> {
+            if (firm.hasMessageOfType(Messages.HouseholdOrFirmWantsToPurchase.class)) {
+                firm.getMessagesOfType(Messages.HouseholdOrFirmWantsToPurchase.class).forEach(purchaseMessage -> {
                     firm.demand += purchaseMessage.demand;
                     firm.stock -= purchaseMessage.bought;
                     // cash received from the goods sold -> without subtracting costs of production and payment to workers/investors
                     firm.earnings += firm.priceOfGoods * purchaseMessage.bought;
-
+//                    System.out.println("Firm " + firm.getID() + " demand: " + purchaseMessage.demand + " stock: " + firm.previousOutput + " bought: " + purchaseMessage.bought);
                 });
 
             }
             firm.inventory += firm.stock;
             firm.stock = 0;
+
+            if (firm.hasMessageOfType(Messages.IntermediateGoodBought.class)){
+                firm.getMessagesOfType(Messages.IntermediateGoodBought.class).forEach(intGoodMessage -> {
+                    double prevQuantity = firm.stockOfIntermediateGood.get(intGoodMessage.good);
+                    firm.stockOfIntermediateGood.remove(intGoodMessage.good);
+                    firm.stockOfIntermediateGood.put(intGoodMessage.good, prevQuantity + intGoodMessage.quantity);
+                    firm.spentOnIntermediateGoods += intGoodMessage.spent;
+                });
+            }
         });
     }
 
@@ -336,8 +372,7 @@ public class Firm extends Agent<Globals> {
             // might be negative as even if firms don't sell anything, they need to pay workers
             firm.healthy = false;
             if (firm.isProductive) {
-                firm.profit = firm.earnings - (firm.wage * firm.workers);
-                firm.deposits += firm.profit;
+                firm.profit = firm.earnings - (firm.wage * firm.workers) - firm.spentOnIntermediateGoods;
 
                 // check if the firm can pay dividends
                 if (firm.profit > 0 && firm.deposits > 0) {
@@ -347,8 +382,9 @@ public class Firm extends Agent<Globals> {
                         dividendPayment.dividend = firm.dividend;
                     });
                 }
-
+                firm.deposits += firm.profit;
                 firm.earnings = 0;
+                firm.spentOnIntermediateGoods = 0;
 
                 // check health of the firm
                 if (firm.deposits > firm.getGlobals().Theta * firm.previousOutput * firm.wage) {
@@ -479,7 +515,29 @@ public class Firm extends Agent<Globals> {
                     firm.priceOfGoods = firm.priceOfGoods * (1.0d - firm.getGlobals().gamma_p * firm.getPrng().uniform(0, 1).sample());
                 }
             }
+
+//            System.out.println("target production " + firm.targetProduction);
             firm.demand = 0;
+        });
+    }
+
+    public static Action<Firm> CheckIfIntGoodsNeeded() {
+        return Action.create(Firm.class, firm -> {
+
+            // this is the target production scaled down
+           int production = (int) Math.ceil(firm.targetProduction / firm.getGlobals().productionConstant);
+
+           // iterate over the current stock of intermediate good to check if it can meet its target production
+           // if not, purchase intermediate good
+           firm.stockOfIntermediateGood.forEach((good, quantity) -> {
+               int maxProduction = (int) Math.floor(quantity / firm.getGlobals().weightsArray[firm.sector][good]);
+
+               // if there isn't enough intermediate good for the target production, purchase more
+               if (maxProduction < production) {
+                   firm.needsIntermediateGoods = true;
+                   firm.IntermediateGoodNeeded.put(good, (production - maxProduction) * firm.getGlobals().weightsArray[firm.sector][good]);
+               }
+           });
         });
     }
 
@@ -487,21 +545,21 @@ public class Firm extends Agent<Globals> {
         return Action.create(Firm.class, firm -> {
             // all are set to true before the conditions are checked
             firm.isHiring = true;
-            int targetWorkers = (int) Math.ceil(firm.targetProduction/ firm.productionConstant); //assuming a one to one relationship
-            System.out.println("Firm " + firm.getID() + " target workers: " + targetWorkers + " current workers " + firm.workers);
+            int targetWorkers = (int) Math.ceil(firm.targetProduction/ firm.getGlobals().productionConstant); //assuming a one to one relationship
+//            System.out.println("Firm " + firm.getID() + " target workers: " + targetWorkers + " current workers " + firm.workers);
             if (targetWorkers > firm.workers) {
                 firm.vacancies = targetWorkers - firm.workers;
-                System.out.println("condition 1");
+//                System.out.println("condition 1");
             } else if (targetWorkers == firm.workers) {
                 firm.vacancies = 0;
                 firm.isHiring = false;
                 firm.workersToBeFired = 0;
-                System.out.println("condition 2");
+//                System.out.println("condition 2");
             } else if (targetWorkers < firm.workers) {
                 firm.isHiring = false;
                 firm.vacancies = 0;
                 firm.workersToBeFired = Math.abs(firm.workers - targetWorkers);
-                System.out.println("condition 3" + " workers to be fired " + firm.workersToBeFired);
+//                System.out.println("condition 3" + " workers to be fired " + firm.workersToBeFired);
             }
         });
     }
@@ -520,7 +578,7 @@ public class Firm extends Agent<Globals> {
             if (!firm.isHiring && firm.workersToBeFired > 0) {
                 int firedWorkers = 0;
                 if (workers.size() < firm.workersToBeFired) {
-                    System.out.println("firm " + firm.getID() + " has " + workers.size() + " workers and needs to fire " + firm.workersToBeFired);
+//                    System.out.println("firm " + firm.getID() + " has " + workers.size() + " workers and needs to fire " + firm.workersToBeFired);
                 }
                 // TODO: Check why so many workers are being fired
                 while (firedWorkers < firm.workersToBeFired) {
@@ -550,10 +608,12 @@ public class Firm extends Agent<Globals> {
 
     public void determineSizeOfCompany() {
         double rand = getPrng().uniform(0, 1).sample();
-        if (rand < getGlobals().percentMicroSmallFirms) {
+        if (rand < getGlobals().percentMicroFirms) {
             sizeOfCompany = 0;
-        } else {
+        } else if (rand >= getGlobals().percentMicroFirms && rand < (getGlobals().percentMicroFirms + getGlobals().percentSmallFirms)){
             sizeOfCompany = 1;
+        } else {
+            sizeOfCompany = 2;
         }
     }
 }

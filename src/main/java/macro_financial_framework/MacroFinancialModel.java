@@ -51,7 +51,6 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
         Group<GoodsMarket> goodsMarket = generateGroup(GoodsMarket.class, getGlobals().nbGoods, goodsVariable -> {
             goodsVariable.householdsDemandingGoods = new ArrayList<>();
             goodsVariable.firmsSupplyingGoods = new ArrayList<>();
-            goodsVariable.firmsSupplyingIntermediateGoods = new ArrayList<>();
             goodsVariable.firmsDemandingIntermediateGoods = new ArrayList<>();
             goodsVariable.goodTraded = i; // the ID of the good when the agent is being created
 //            goodsVariable.competitive = Math.random() < 0.5; // randomly sets it as a competitive good or not
@@ -71,6 +70,8 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
             firm.determineSizeOfCompany();
             firm.isProductive = true;
             firm.isHiring = true;
+            firm.stockOfIntermediateGood = new HashMap<Integer, Double>();
+            firm.IntermediateGoodNeeded = new HashMap<Integer, Double>();
         });
 
 
@@ -140,6 +141,9 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
         // Initial settings that do not need to get repeated throughout
         if (getContext().getTick() == 0) {
 
+            // set the initial weights that relate the firms for the intermediate goods
+            run(Economy.InitWeights());
+
             // firms set their vacancies according to their size
             run(Firm.SetVacancies());
 
@@ -167,7 +171,6 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
 
         // workers apply for jobs and firms that have vacancies hire
         // firms decide what good they produce depending on the sector they're in
-        // TODO: check the flow of actions here, doesn't make sense as of now
         run(
                 Split.create(
                         // if the worker is unemployed, the worker applies for a job. Received by the economy
@@ -194,7 +197,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
         // Firms produce their good according to the productivity of the firm, the number of workers and the size of the firm
         run(Firm.FirmsProduce());
 
-        run(Firm.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firm.receiveIntermediateGoodsAndDemand());
+//        run(Firm.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firm.receiveIntermediateGoodsAndDemand());
 
         // calculates the average price of products and sends it to the firms
         // this is needed for the firm to update its strategy
@@ -214,16 +217,16 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
         run(
                 Split.create(
                         Household.sendDemand(),
-                        Firm.sendSupply()),
+                        Firm.sendSupplyAndDemand()),
                 GoodsMarket.matchSupplyAndDemand(),
                 Split.create(
-                        Firm.receiveDemand(),
+                        Firm.receiveDemandAndIntermediateGoods(),
                         Household.updateFromPurchase()
                 )
         );
 
-        //TODO: update inflation so that it considers intermediate goods as well (?)
-        run(Firm.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firm.receiveIntermediateGoodsAndDemand());
+//        //TODO: update inflation so that it considers intermediate goods as well (?)
+//        run(Firm.SendIntermediateGoodInfo(), GoodsMarket.MatchSupplyAndDemandIntermediateGoods(), Firm.receiveIntermediateGoodsAndDemand());
 
 
         //TODO: check if all the functions below are right
@@ -232,7 +235,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
                         Firm.sendInfoToGetAvailableWorkers(),
                         Household.SendUnemployment()
                 ),
-                Economy.calculateUnemploymentAndAavailableWorkers(),
+                Economy.calculateUnemploymentAndAvailableWorkers(),
                 Firm.receiveAvailableWorkers()
         );
 
@@ -257,6 +260,9 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
 
         //update the target production to meet the demand
         run(Firm.adjustPriceProduction());
+
+        // Once it has an updated target production it can check if it needs more intermediate goods
+        run(Firm.CheckIfIntGoodsNeeded());
 
         // updates firms' vacancies according to the new target production
         run(Firm.UpdateVacancies());

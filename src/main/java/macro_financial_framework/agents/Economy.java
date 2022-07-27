@@ -2,7 +2,7 @@ package macro_financial_framework.agents;
 
 //import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
 
-import macro_financial_framework.*;
+import better.files.File;
 import macro_financial_framework.utils.*;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
@@ -35,7 +35,25 @@ public class Economy extends Agent<Globals> {
     public ArrayList<Long> bankruptFirmsArray;
     public HashMap<Long, BailoutPackage> bailedOutFirmsMap;
 
+    public static Action<Economy> InitWeights() {
+        return Action.create(Economy.class, economy -> {
 
+            // empirical data from the austrian economy -> 62x62 matrix collapse into 10x10 matrix
+            // sum of all the rows should equal one
+            double a[][] = {{0.446077143, 0.332209946, 0.054489028, 0.065645351, 0.004974503, 0.025114853, 0.01029264, 0.058379932, 0.001662539, 0.001154064},
+                    {0.026752214, 0.698613993, 0.029356368, 0.120582545, 0.018077628, 0.021997578, 0.012313881, 0.068505531, 0.001803847, 0.001996415},
+                    {0.000258603, 0.371519029, 0.380510689, 0.078452974, 0.003745658, 0.017886715, 0.020984379, 0.124729182, 0.000975335, 0.000937436},
+                    {0.00306286, 0.219450082, 0.039462672, 0.408299033, 0.025581603, 0.039316993, 0.090062361, 0.163416189, 0.003437634, 0.007910574},
+                    {7.27588E-06, 0.208309968, 0.010395399, 0.052818424, 0.444684707, 0.026364472, 0.048159009, 0.170233117, 0.00187896, 0.037148669},
+                    {1.79544E-05, 0.031672296, 0.011619596, 0.058637984, 0.089736979, 0.551249182, 0.033186157, 0.213027859, 0.006717462, 0.00413453},
+                    {0.000210885, 0.237516128, 0.260010802, 0.010885532, 0.010657744, 0.132664404, 0.201939338, 0.145022912, 0.000390379, 0.000701877},
+                    {0.001257607, 0.103868827, 0.014023935, 0.142682885, 0.086673445, 0.055527533, 0.055759544, 0.529754306, 0.005200104, 0.005251815},
+                    {0.002763084, 0.313877838, 0.075627115, 0.118724354, 0.036005715, 0.066325106, 0.145184494, 0.157118542, 0.072541413, 0.01183234},
+                    {0.000277457, 0.230205887, 0.070512975, 0.131287762, 0.043116028, 0.05831017, 0.121092903, 0.230302527, 0.003223874, 0.111670418}
+            };
+            economy.getGlobals().weightsArray = a;
+        });
+    }
     public static Action<Economy> AssignInvestorToFirm() {
         return Action.create(Economy.class, market -> {
 
@@ -144,12 +162,12 @@ public class Economy extends Agent<Globals> {
 
             // stores the previous average price to calculate inflation
             market.previousAveragePrice = market.averagePrice;
-//            System.out.println("previous average price " + market.averagePrice);
+            System.out.println("previous average price " + market.averagePrice);
 //            System.out.println("average price " + market.averagePrice + " previous average price " + market.previousAveragePrice);
 
             // new average price
             market.averagePrice = market.numerator / market.denominator;
-//            System.out.println("previous average price " + market.previousAveragePrice + " current average price " + market.averagePrice);
+            System.out.println("previous average price " + market.previousAveragePrice + " current average price " + market.averagePrice);
             market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class,  (m, l) -> {
                 m.averagePrice = market.averagePrice;
             });
@@ -211,7 +229,7 @@ public class Economy extends Agent<Globals> {
         });
     }
 
-    public static Action<Economy> calculateUnemploymentAndAavailableWorkers() {
+    public static Action<Economy> calculateUnemploymentAndAvailableWorkers() {
         return Action.create(Economy.class, market -> {
 
             market.unemployment = 0;
@@ -219,6 +237,8 @@ public class Economy extends Agent<Globals> {
                 market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->
                         market.unemployment += 1);
             }
+            market.unemployment /= market.getGlobals().nbWorkers;
+            System.out.println("Unemployment " + market.unemployment);
 
             // send the current unemployment to the firms
             market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
