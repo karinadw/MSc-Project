@@ -89,8 +89,8 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
                 household.wealth = getGlobals().initialSaving;
                 double moneyToSpend = getGlobals().c * household.wealth;
                 int exclusiveGoods = (int) Math.ceil(getGlobals().nbExclusiveGoods * getGlobals().nbGoods);
-                for (int j = 0; j < getGlobals().nbGoods - exclusiveGoods; j++) {
-                    household.budget.put(j, moneyToSpend / ((getGlobals().nbGoods) - exclusiveGoods));
+                for (int j = 0; j < getGlobals().nbGoods; j++) {
+                    household.budget.put(j, moneyToSpend / getGlobals().nbGoods);
                 }
             } else {
                 // wealthy individuals
@@ -110,7 +110,7 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
             household.unemploymentBenefits = (61.05 + 77.00); // average of above and below 24 years, not dividing by 2 because this is received every 2 weeks.
 
             // TODO: check if these numbers make sense
-            household.productivity = household.getPrng().uniform(0.5, 1).sample();
+            household.productivity = household.getPrng().uniform(0.1, 1).sample();
         });
 
 
@@ -149,6 +149,8 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
 
             //the firm sets the prices of the goods it produces
             run(Firm.SetPriceOfGoods());
+
+            run(Firm.SetWages());
 
             // setting all firms with an initial stock of intermediate goods so that every firm can produce
             run(Firm.SetInitialStockOfIntermediateGoods());
@@ -191,8 +193,6 @@ public class MacroFinancialModel extends AgentBasedModel<Globals> {
 
         // the productivity of the firm is dependant on the productivity of the workers
         run(Household.sendProductivity(), Firm.CalculateFirmProductivity());
-
-        run(Firm.SetWages());
 
         // Firms produce their good according to the productivity of the firm, the number of workers and the size of the firm
         run(Firm.FirmsProduce());

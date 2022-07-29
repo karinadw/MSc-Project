@@ -48,6 +48,10 @@ public class GoodsMarket extends Agent<Globals> {
                 });
             }
 
+            Collections.shuffle(goodMarket.firmsSupplyingGoods, goodMarket.getPrng().getRandom());
+            Collections.shuffle(goodMarket.householdsDemandingGoods, goodMarket.getPrng().getRandom());
+            Collections.shuffle(goodMarket.firmsDemandingIntermediateGoods, goodMarket.getPrng().getRandom());
+
             // (1) it first sells to the firms that are demanding goods for production
 
             // demand has to be sorted in descending order, giving priority to those that are demanding bigger quantities

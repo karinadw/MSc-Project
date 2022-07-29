@@ -195,6 +195,8 @@ public class Household extends Agent<Globals> {
                 worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Unemployed.class, (unemploymentMessage, linkToEconomy) -> {
                     unemploymentMessage.sector = worker.sector_skills;
                 });
+            } else {
+                worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.Employed.class);
             }
         });
     }

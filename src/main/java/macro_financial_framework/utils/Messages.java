@@ -101,7 +101,7 @@ public class Messages {
         public int workers;
     }
     public static class CurrentUnemployment extends Message {
-        public int unemployment;
+        public double unemployment;
     }
 
     public static class HealthyFirmAccountMessage extends Message {
@@ -148,7 +148,7 @@ public class Messages {
         public double debt;
     }
 
-    public static class NoDebt extends Message.Empty{}
+    public static class Employed extends Message.Empty{}
 
     public static class InvestorPaysRevival extends Message {
         public double debt;

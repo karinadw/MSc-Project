@@ -2,7 +2,6 @@ package macro_financial_framework.agents;
 
 //import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
 
-import better.files.File;
 import macro_financial_framework.utils.*;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
@@ -29,7 +28,9 @@ public class Economy extends Agent<Globals> {
     @Variable
     public double inflation;
     @Variable
-    public int unemployment = 0;
+    public double unemployment;
+    @Variable
+    public double employment;
     public double deficit = 0;
     public HashMap<Long, Double> indebtedFirmsMap;
     public ArrayList<Long> bankruptFirmsArray;
@@ -85,61 +86,6 @@ public class Economy extends Agent<Globals> {
         });
     }
 
-    public static Action<Economy> SetFirmProperties() {
-        // sets the sector specific goods
-        // sets the sector specific wages
-        // sends these to the firms
-        return Action.create(Economy.class, market -> {
-            // creating a hashmap tp store all the sectors and their corresponding wage
-            HashMap<Integer, Double> sectorWages = new HashMap<Integer, Double>();
-            HashMap<Integer, Integer> sectorGood = new HashMap<Integer, Integer>();
-            HashMap<Integer, Integer> sectorGoodToPurchase = new HashMap<Integer, Integer>();
-            int numberOfSectors = market.getGlobals().nbSectors; // not adding -1 and instead keeping i<numberOfSector instead of <=
-            int numberOfGoods = market.getGlobals().nbGoods; // not adding -1 and instead keeping i<numberOfSector instead of <=
-            for (int i = 0; i < numberOfSectors; i++) {
-                int sector = i;
-                // TODO: Wages should be relative to production / price of goods - check if the numbers for the wages makes sense
-                double wage = market.getPrng().uniform(20.00, 40.00).sample();
-                sectorWages.put(sector, wage);
-                // int good = market.getPrng().getNextInt(numberOfGoods);
-                int good = sector;
-                // TODO: check if assumption below is fine
-                // Setting one good per sector, obvs this is a complex way of doing it but it is left like this in case the assumption is not valid
-                sectorGood.put(sector, good);
-
-//                int goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
-//                // I've just put greater than 0 as a placeholder
-//                // the loop will keep going if the good to purchase in that sector and the one being produced are the same
-//                // when they are not there is a break statement
-//                while (goodNeededForProduction >= 0){
-//                    // if the good of that sector and the good needed for production are the same then recalculate
-//                    if (goodNeededForProduction == good){
-//                        goodNeededForProduction = market.getPrng().getNextInt(numberOfGoods);
-//                    } else if (goodNeededForProduction != good){
-//                        sectorGoodToPurchase.put(sector, goodNeededForProduction);
-//                        break;
-//                    }
-//                }
-
-                // easier way to do the above -> this was all firms has a connection with another firm for intermediate goods
-                int goodNeededForProduction = (i+1) % numberOfGoods;
-                sectorGoodToPurchase.put(sector, goodNeededForProduction);
-            }
-
-            market.getMessagesOfType(Messages.FirmInformation.class).forEach(m -> {
-                int firmSector = m.sector;
-                double firmWage = sectorWages.get(firmSector);
-                int goodTraded = sectorGood.get(firmSector);
-                int goodToPurchase = sectorGoodToPurchase.get(firmSector);
-                market.send(Messages.FirmProperties.class, msg -> {
-                    msg.wage = firmWage;
-                    msg.good = goodTraded;
-                    msg.goodToPurchase = goodToPurchase;
-                }).to(m.getSender());
-            });
-        });
-    }
-
     public static Action<Economy> GetPrices() {
         return Action.create(Economy.class, market -> {
             market.priceOfGoods.clear();
@@ -162,8 +108,6 @@ public class Economy extends Agent<Globals> {
 
             // stores the previous average price to calculate inflation
             market.previousAveragePrice = market.averagePrice;
-            System.out.println("previous average price " + market.averagePrice);
-//            System.out.println("average price " + market.averagePrice + " previous average price " + market.previousAveragePrice);
 
             // new average price
             market.averagePrice = market.numerator / market.denominator;
@@ -177,7 +121,8 @@ public class Economy extends Agent<Globals> {
     public static Action<Economy> CalculateInflation() {
         return Action.create(Economy.class, market -> {
             market.inflation = (market.averagePrice - market.previousAveragePrice) / market.previousAveragePrice;
-            market.inflation = market.inflation / market.getGlobals().gamma_p;
+            //System.out.println(market.inflation+2);
+            market.inflation = (market.inflation / market.getGlobals().gamma_p) + 2;
         });
 
     }
@@ -195,18 +140,23 @@ public class Economy extends Agent<Globals> {
                 market.firmsHiring.add(new FirmID(mes.getSender(), mes.sector, mes.vacancies));
             });
 
+            Collections.shuffle(market.availableWorkers, market.getPrng().getRandom());
+            Collections.shuffle(market.firmsHiring, market.getPrng().getRandom());
+
             market.firmsHiring.forEach(firm -> {
                 int sector = firm.sector;
                 int vacancies = firm.vacancies;
 
                 while (vacancies > 0) {
+
+                    // sort from high to low productivity
                     market.availableWorkers.sort(Comparator.comparing(worker -> worker.productivity));
                     Collections.reverse(market.availableWorkers);
-                    Optional<WorkerID> potentialWorkerGoodCandidate = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();
-                    if (potentialWorkerGoodCandidate.isPresent()) {
+                    Optional<WorkerID> potentialWorker = market.availableWorkers.stream().filter(w -> w.sector == sector).findFirst();
+                    if (potentialWorker.isPresent()) {
 
                         // sends message to the workers
-                        WorkerID worker = potentialWorkerGoodCandidate.get();
+                        WorkerID worker = potentialWorker.get();
                         market.send(Messages.Hired.class, m -> {
                             m.firmID = firm.ID;
                         }).to(worker.ID);
@@ -233,12 +183,21 @@ public class Economy extends Agent<Globals> {
         return Action.create(Economy.class, market -> {
 
             market.unemployment = 0;
-            if (market.hasMessageOfType(Messages.Unemployed.class)) {
-                market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->
-                        market.unemployment += 1);
-            }
-            market.unemployment /= market.getGlobals().nbWorkers;
-            System.out.println("Unemployment " + market.unemployment);
+            market.employment = 0;
+            market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->
+                    market.unemployment += 1);
+            market.getMessagesOfType(Messages.Employed.class).forEach(employed ->
+                    market.employment += 1);
+
+            //market.unemployment /= market.getGlobals().nbWorkers;
+            market.unemployment = (market.unemployment / (double) market.getGlobals().nbWorkers) * 100;
+            market.employment = (market.employment / (double) market.getGlobals().nbWorkers) * 100;
+
+//             //for debugging purposes
+//            System.out.println("Unemployment " + market.unemployment);
+//            System.out.println("Employment " + market.employment);
+//            System.out.println(market.getGlobals().nbWorkers);
+//            System.out.println(market.employment + market.unemployment + market.getGlobals().nbFirms);
 
             // send the current unemployment to the firms
             market.getLinks(Links.EconomyToFirm.class).send(Messages.CurrentUnemployment.class, (unemploymentMessage, linkToFirms) -> {
@@ -272,36 +231,6 @@ public class Economy extends Agent<Globals> {
         });
     }
 
-    //TODO: check this code when simulation works
-    //TODO: there is probably a more efficient way of doing this
-//    public static Action<Economy> calculateAvailableWorkers() {
-//        // store all the IDs of the workers and their respective sector
-//        return Action.create(Economy.class, market -> {
-//            HashMap<Long, Integer> availableWorkers = new HashMap<Long, Integer>();
-//            if (market.hasMessageOfType(Messages.Unemployed.class)) {
-//                market.getMessagesOfType(Messages.Unemployed.class).forEach(msg ->
-//                        availableWorkers.put(msg.getSender(), msg.sector)
-//                );
-//            }
-//
-//            // store the sector and the total available workers per sector
-//            HashMap<Integer, Integer> availableWorkersPerSector = new HashMap<Integer, Integer>();
-//            for(int sector = 0; sector < market.getGlobals().nbSectors; sector++){
-//                int workers = Collections.frequency(availableWorkers.values(), sector);
-//                availableWorkersPerSector.put(sector, workers);
-//            }
-//
-//            // for each message from the firm, the economy sends a message back to the firm with the available workers in its sector
-//            if (market.hasMessageOfType(Messages.FirmGetAvailableWorkers.class)){
-//                market.getMessagesOfType(Messages.FirmGetAvailableWorkers.class).forEach(message -> {
-//                    market.send(Messages.AvailableWorkersInYourSector.class, totalAvailableWorkers -> {
-//                        totalAvailableWorkers.sector = availableWorkersPerSector.get(message.sector);
-//                    }).to(message.getSender());
-//                });
-//            }
-//        });
-//    }
-
     public static Action<Economy> receiveHealthyFirmAccounts() {
         return Action.create(Economy.class, economy -> {
             economy.healthyFirmAccountMap.clear();
@@ -333,7 +262,7 @@ public class Economy extends Agent<Globals> {
                     long healthyFirmID = healthyFirmIDs.get(idx);
 
                     // first condition is the random probability of the healthy firm acquiring the indebted firm
-                    if ((economy.getPrng().uniform(0, 1).sample() < 1 - economy.getGlobals().f) & (economy.healthyFirmAccountMap.get(healthyFirmID).deposits > -debt)) {
+                    if ((economy.getPrng().uniform(0, 1).sample() < 1 - economy.getGlobals().f) && (economy.healthyFirmAccountMap.get(healthyFirmID).deposits > -debt)) {
 
                         // the healthy firm pays off the debt of the indebted firm
                         economy.healthyFirmAccountMap.get(healthyFirmID).updateDeposits(debt);

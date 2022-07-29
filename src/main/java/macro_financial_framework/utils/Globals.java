@@ -54,8 +54,6 @@ public class Globals extends GlobalState {
     public double mu = 1.0;
     @Input(name="gammaW")
     public double gamma_w = 0.05d;
-
-    @Input
     public int nbGoods = nbSectors;
 
     public HashMap<Integer, Long> goodExchangeIDs;
@@ -74,8 +72,6 @@ public class Globals extends GlobalState {
     public long initialSaving = 10000;
     @Input
     public long initialSavingRich = 35000;
-    @Input
-    public long initialDeposits = 10000;
     @Input
     public int deposistsMultiplier = 2;
 
