@@ -1,4 +1,4 @@
-package macro_financial_framework.utils;
+package SimpleEconomyModel.utils;
 
 import simudyne.core.graph.Link;
 

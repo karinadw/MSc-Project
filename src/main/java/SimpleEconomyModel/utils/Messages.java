@@ -1,4 +1,4 @@
-package macro_financial_framework.utils;
+package SimpleEconomyModel.utils;
 
 import simudyne.core.graph.Message;
 
@@ -83,6 +83,11 @@ public class Messages {
         public double price;
     }
 
+    public static class FirmsPriceDemandedGoods extends Message{
+        public double output;
+        public double price;
+    }
+
     public static class PayInvestors extends Message {
         public double dividend;
     }
@@ -152,6 +157,11 @@ public class Messages {
 
     public static class InvestorPaysRevival extends Message {
         public double debt;
+    }
+
+    public static class SoldGoodsAndPrices extends Message {
+        public int quantitySold;
+        public double price;
     }
 
 }

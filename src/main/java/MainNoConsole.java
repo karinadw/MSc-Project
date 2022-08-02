@@ -1,4 +1,4 @@
-import macro_financial_framework.MacroFinancialModel;
+import SimpleEconomyModel.SimpleEconomyModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import simudyne.core.exec.runner.ModelRunner;
@@ -15,7 +15,7 @@ public class MainNoConsole {
     public static void main(String[] args) {
         try {
             RunnerBackend runnerBackend = RunnerBackend.create();
-            ModelRunner modelRunner = runnerBackend.forModel(MacroFinancialModel.class);
+            ModelRunner modelRunner = runnerBackend.forModel(SimpleEconomyModel.class);
 
             Map<String, String> _config;
             Map<String, Object> _input;

@@ -1,4 +1,4 @@
-package macro_financial_framework.utils;
+package SimpleEconomyModel.utils;
 
 import simudyne.core.abm.GlobalState;
 import simudyne.core.annotations.Input;
@@ -15,17 +15,17 @@ public class Globals extends GlobalState {
     public long nbWorkers = 1000;
 
     @Input(name = "Percentage Firms Micro-Small")
-    public double percentMicroFirms = 0.90;
+    public double percentMicroFirms = 0.80;
 
     @Input(name = "Percentage Firms Micro-Small")
-    public double percentSmallFirms = 0.02;
+    public double percentSmallFirms = 0.1;
 
     @Input(name = "Number of Sectors")
     public int nbSectors = 10;
 
     //TODO: check this
     @Input(name = "Multiplier for production")
-    public int productionConstant = 30;
+    public int productionConstant = 1;
 
     @Input
     public double c = 0.2d; // this is for calculating the consumption budget
@@ -67,15 +67,21 @@ public class Globals extends GlobalState {
     @Input
     public double nbExclusiveGoods = 0.2d; // its a percentage
     @Input
-    public double percentageWealthyHouseholds = 0.01;
+    public double percentageWealthyHouseholds = 0.1;
     @Input
     public long initialSaving = 10000;
     @Input
     public long initialSavingRich = 35000;
     @Input
     public int deposistsMultiplier = 2;
-
     public double[][] weightsArray;
+    public int[][] householdGoodWeights = {{1}, {1}, {1}, {1}, {1}, {1}, {1}, {1}, {1}, {1}};
+    public int nbGoodsHouseholds = 6;
+
+    // debugging
+    public int unemployedCounter = 0;
+    public int totalVacancies = 0;
+    public int nonProductiveFirms= 0;
 
 
 }

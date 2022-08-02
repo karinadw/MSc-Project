@@ -1,9 +1,8 @@
-package macro_financial_framework.agents;
+package SimpleEconomyModel.agents;
 
-import macro_financial_framework.utils.Globals;
-import macro_financial_framework.utils.Links;
-import macro_financial_framework.MacroFinancialModel;
-import macro_financial_framework.utils.Messages;
+import SimpleEconomyModel.utils.Globals;
+import SimpleEconomyModel.utils.Links;
+import SimpleEconomyModel.utils.Messages;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -13,20 +12,16 @@ import java.util.HashMap;
 public class Household extends Agent<Globals> {
     @Variable
     public int sector_skills;
+    @Variable
+    public double productivity;
     public boolean rich;
-//    @Variable
-//    public double accumulatedSalary;
     public double wealth;
     public double wage;
     public double unemploymentBenefits;
-    @Variable
-    public double productivity;
     public double consumptionBudget = 0;
-
-    public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED, INVESTOR}
-
+    public enum Status {WORKER_EMPLOYED, WORKER_UNEMPLOYED, WORKER_UNEMPLOYED_APPLIED}
+    public boolean isInvestor;
     public Status status = Status.WORKER_UNEMPLOYED; //everyone starts by being unemployed
-    public int lenghtOfUnemployment = 0;
     public HashMap<Integer, Double> budget;
     public int lenOfUnemployment = 0;
 
@@ -40,8 +35,9 @@ public class Household extends Agent<Globals> {
     public static Action<Household> DetermineStatus() {
         return Action.create(Household.class, household -> {
             // check if household has been assigned a firm and therefore status of investor
+            household.isInvestor = false;
             if (household.hasMessageOfType(Messages.FirmAssignedToInvestor.class)) {
-                household.status = Status.INVESTOR;
+                household.isInvestor = true;
                 household.addLink(household.getMessageOfType(Messages.FirmAssignedToInvestor.class).firmID, Links.InvestorToFirmLink.class);
             }
         });
@@ -51,12 +47,14 @@ public class Household extends Agent<Globals> {
         return Action.create(Household.class,
                 worker -> {
                     if (worker.status == Status.WORKER_UNEMPLOYED) {
+                        worker.getGlobals().unemployedCounter++;
                         worker.getLinks(Links.HouseholdToEconomy.class).send(Messages.JobApplication.class, (msg, link) -> {
                             msg.productivity = worker.productivity;
                             msg.sector = worker.sector_skills;
                         });
                         worker.status = Status.WORKER_UNEMPLOYED_APPLIED;
                     }
+//                    System.out.println("Unemployed workers " + worker.getGlobals().unemployedCounter);
                 });
     }
 

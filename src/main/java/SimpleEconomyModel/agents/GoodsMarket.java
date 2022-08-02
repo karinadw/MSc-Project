@@ -1,22 +1,21 @@
-package macro_financial_framework.agents;
+package SimpleEconomyModel.agents;
 
-import macro_financial_framework.utils.*;
+import SimpleEconomyModel.utils.*;
 import simudyne.core.abm.Agent;
 import simudyne.core.abm.Action;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class GoodsMarket extends Agent<Globals> {
 
     public int goodTraded;
-    public boolean competitive;
-
     public List<FirmSupplyInformation> firmsSupplyingGoods;
     public List<HouseholdDemandInformation> householdsDemandingGoods;
     public List<FirmsIntermediateGoodDemand> firmsDemandingIntermediateGoods;
+
+    public HashMap<Integer, Double> priceOfGoods;
+    private double numerator; // this is the sum of the product of the price and output for each firm
+    private double denominator; // this is the sum of the output of every firm
 
     public static Action<GoodsMarket> matchSupplyAndDemand() {
         return Action.create(GoodsMarket.class, goodMarket -> {
@@ -26,7 +25,7 @@ public class GoodsMarket extends Agent<Globals> {
             goodMarket.firmsDemandingIntermediateGoods.clear();
 
             // storing the demand of intermediate goods
-            if (goodMarket.hasMessageOfType(Messages.PurchaseIntermediateGood.class)){
+            if (goodMarket.hasMessageOfType(Messages.PurchaseIntermediateGood.class)) {
                 goodMarket.getMessagesOfType(Messages.PurchaseIntermediateGood.class).forEach(firmDemanding -> {
                     goodMarket.firmsDemandingIntermediateGoods.add(new FirmsIntermediateGoodDemand(firmDemanding.getSender(), firmDemanding.demand));
                 });
@@ -35,6 +34,7 @@ public class GoodsMarket extends Agent<Globals> {
             // storing the supply for this good
             if (goodMarket.hasMessageOfType(Messages.FirmSupply.class)) {
                 goodMarket.getMessagesOfType(Messages.FirmSupply.class).forEach(firmSupply -> {
+//                    System.out.println("receiving a supply of " + firmSupply.output + " from firm " + firmSupply.getSender() + " in good market " + goodMarket.goodTraded);
                     if (firmSupply.output > 0) {
                         goodMarket.firmsSupplyingGoods.add(new FirmSupplyInformation(firmSupply.getSender(), firmSupply.output, firmSupply.price));
                     }
@@ -89,6 +89,9 @@ public class GoodsMarket extends Agent<Globals> {
                                 demandInformation.bought = finalQuantityDemanded;
                             }).to(firmToBuyFrom.get().ID);
 
+                            // updates list of bought items and its price
+                            goodMarket.priceOfGoods.put(finalQuantityDemanded, priceOfIntermediateGood);
+
                             // remove and add the firm with the update quantity available
                             goodMarket.firmsSupplyingGoods.remove(firmToBuyFrom.get());
                             quantityAvailable -= quantityDemanded;
@@ -101,7 +104,7 @@ public class GoodsMarket extends Agent<Globals> {
 
                         // if the quantity demanded is more than the quantity available
                         // the firm will purchase all of it and move to the next firm supplying intermediate goods
-                        else if (quantityDemanded > quantityAvailable){
+                        else if (quantityDemanded > quantityAvailable) {
                             long finalQuantityAvailable = quantityAvailable;
                             goodMarket.send(Messages.IntermediateGoodBought.class, purchaseInformation -> {
                                 purchaseInformation.good = goodMarket.goodTraded;
@@ -115,6 +118,9 @@ public class GoodsMarket extends Agent<Globals> {
                                 demandInformation.demand = finalQuantityDemanded1;
                                 demandInformation.bought = (int) finalQuantityAvailable1;
                             }).to(firmToBuyFrom.get().ID);
+
+                            // updates list of bought items and its price
+                            goodMarket.priceOfGoods.put((int) finalQuantityAvailable1, priceOfIntermediateGood);
 
                             // update the demanded quantity
                             quantityDemanded -= quantityAvailable;
@@ -137,7 +143,6 @@ public class GoodsMarket extends Agent<Globals> {
             // Comparator.comparing sorts it from low to high, so we reverse it to give bigger consumers priority
             Collections.reverse(goodMarket.householdsDemandingGoods);
 
-
             // iterate over all the households, starting from the ones with most demand and match them to a firm that has supply and the cheapest price
             goodMarket.householdsDemandingGoods.forEach(household -> {
 
@@ -156,6 +161,9 @@ public class GoodsMarket extends Agent<Globals> {
                         long quantityAvailable = firmToPurchaseFrom.get().output;
                         int quantityDemanded = (int) Math.floor(demandFromHousehold / priceOfGood);
 
+//                        System.out.println("Household " + household.ID + " wants to purchase " + quantityDemanded);
+//                        System.out.println("Firm " + firmToPurchaseFrom.get().ID + " is supplying " + quantityAvailable);
+
                         if (quantityDemanded == 0) {
                             // logic: this is the cheapest product it can find and if it can't afford that it won't be able to afford that it won't be able to afford anything
                             break;
@@ -164,6 +172,7 @@ public class GoodsMarket extends Agent<Globals> {
                             // it buys everything from the firm and looks for the next cheapest one to complete the purchase
                             long finalQuantityAvailable = quantityAvailable;
                             goodMarket.send(Messages.HouseholdOrFirmWantsToPurchase.class, message -> {
+//                                System.out.println("sending a message to firm " + firmToPurchaseFrom.get().ID + ". Bought: " + finalQuantityAvailable);
                                 message.demand = quantityDemanded;
                                 message.bought = finalQuantityAvailable;
                             }).to(firmToPurchaseFrom.get().ID);
@@ -180,6 +189,8 @@ public class GoodsMarket extends Agent<Globals> {
                             // this firm no longer has any available goods -> it's removed from the list of firms
                             goodMarket.firmsSupplyingGoods.remove(firmToPurchaseFrom.get());
 
+//                            System.out.println("Firm " + firmToPurchaseFrom.get().ID + " is sold out.");
+
                         } else if (quantityDemanded < quantityAvailable) {
                             goodMarket.send(Messages.HouseholdOrFirmWantsToPurchase.class, m -> {
                                 m.demand = quantityDemanded;
@@ -190,6 +201,9 @@ public class GoodsMarket extends Agent<Globals> {
                             goodMarket.send(Messages.PurchaseCompleted.class, spentMessage -> {
                                 spentMessage.spent = quantityDemanded * priceOfGood;
                             }).to(household.ID);
+
+                            // updates list of bought items and its price
+                            goodMarket.priceOfGoods.put((int) quantityDemanded, priceOfGood);
 
                             // update the consumption budget of the household
                             demandFromHousehold = demandFromHousehold - (quantityDemanded * priceOfGood);
@@ -202,6 +216,7 @@ public class GoodsMarket extends Agent<Globals> {
                             }
                         }
                     } else {
+//                        System.out.println("no more firm to buy from, good traded: " + goodMarket.goodTraded);
                         // when there are no more firms to purchase from
                         break;
                     }
@@ -210,4 +225,16 @@ public class GoodsMarket extends Agent<Globals> {
         });
     }
 }
+
+//    public static Action<GoodsMarket> CalculateAveragePrice() {
+//        return Action.create(GoodsMarket.class, goodsMarket -> {
+//            goodsMarket.priceOfGoods.forEach((quantity, price) -> {
+//               goodsMarket.getLinks(Links.GoodsMarketToEconomy.class).send(Messages.SoldGoodsAndPrices.class, (msg, link) -> {
+//                  msg.price = price;
+//                  msg.quantitySold = quantity;
+//               });
+//            });
+//        });
+//    }
+//}
 

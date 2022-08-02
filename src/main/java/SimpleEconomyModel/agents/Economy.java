@@ -1,8 +1,8 @@
-package macro_financial_framework.agents;
+package SimpleEconomyModel.agents;
 
 //import jdk.javadoc.internal.doclets.toolkit.taglets.snippet.Style;
 
-import macro_financial_framework.utils.*;
+import SimpleEconomyModel.utils.*;
 import simudyne.core.abm.Action;
 import simudyne.core.abm.Agent;
 import simudyne.core.annotations.Variable;
@@ -11,27 +11,22 @@ import java.util.*;
 
 public class Economy extends Agent<Globals> {
 
-    public List<WorkerID> availableWorkers;
-    public List<FirmID> firmsHiring;
-    //    public List<FirmSupplyInformation> firmsSupplyingGoods;
-//    public List<HouseholdDemandInformation> householdsDemandingGoods;
-    public HashMap<Double, Double> priceOfGoods;
-
-    public HashMap<Long, HealthyFirmAccount> healthyFirmAccountMap;
-    //    public HashMap<Long, Double> firmWages;
-//    public HashMap<Long, Double> firmProductivity;
-    // this is to calculate the average price -> TODO: find a better way of doing this
-    private double numerator = 0; // this is the sum of the product of the price and output for each firm
-    private double denominator = 0; // this is the sum of the output of every firm
-    public double averagePrice;
-    public double previousAveragePrice;
     @Variable
     public double inflation;
     @Variable
     public double unemployment;
     @Variable
     public double employment;
-    public double deficit = 0;
+    public List<WorkerID> availableWorkers;
+    public List<FirmID> firmsHiring;
+    public HashMap<Double, Double> priceOfGoods;
+    public HashMap<Double, Double> priceOfGoodsDemanded;
+    public HashMap<Long, HealthyFirmAccount> healthyFirmAccountMap;
+    public double numerator; // this is the sum of the product of the price and output for each firm
+    public double denominator; // this is the sum of the output of every firm
+    public double averagePrice;
+    public double previousAveragePrice;
+    public double deficit;
     public HashMap<Long, Double> indebtedFirmsMap;
     public ArrayList<Long> bankruptFirmsArray;
     public HashMap<Long, BailoutPackage> bailedOutFirmsMap;
@@ -55,6 +50,7 @@ public class Economy extends Agent<Globals> {
             economy.getGlobals().weightsArray = a;
         });
     }
+
     public static Action<Economy> AssignInvestorToFirm() {
         return Action.create(Economy.class, market -> {
 
@@ -91,9 +87,44 @@ public class Economy extends Agent<Globals> {
             market.priceOfGoods.clear();
             market.getMessagesOfType(Messages.FirmsPrice.class).forEach(priceMessage -> {
                 market.priceOfGoods.put(priceMessage.price, priceMessage.output);
+                //System.out.println("Received " + priceMessage.output + " units of good at a price of " + priceMessage.price + " from firm " + priceMessage.getSender());
+            });
+            market.priceOfGoodsDemanded.clear();
+            market.getMessagesOfType(Messages.FirmsPriceDemandedGoods.class).forEach(priceMessage -> {
+                market.priceOfGoods.put(priceMessage.price, priceMessage.output);
+                //System.out.println("Received " + priceMessage.output + " units of good at a price of " + priceMessage.price + " from firm " + priceMessage.getSender());
             });
         });
     }
+
+//    public static Action<Economy> ReceiveGoodsSold() {
+//        return Action.create(Economy.class, market -> {
+//            market.numerator = 0;
+//            market.denominator = 0;
+//
+//            // stores the previous average price to calculate inflation
+//            market.getMessagesOfType(Messages.SoldGoodsAndPrices.class).forEach(msg -> {
+//                market.numerator += (msg.price * msg.quantitySold);
+//                market.denominator += msg.quantitySold;
+//                System.out.println("numerator " + market.numerator);
+//                System.out.println("denominator " + market.denominator);
+//            });
+//        });
+//    }
+
+//    public static Action<Economy> ReceiveGoodsSold() {
+//        return Action.create(Economy.class, market -> {
+//            market.numerator = 0;
+//            market.denominator = 0;
+//            // stores the previous average price to calculate inflation
+//            market.getMessagesOfType(Messages.SoldGoodsAndPrices.class).forEach(msg -> {
+//                market.numerator += (msg.price * msg.quantitySold);
+//                market.denominator += msg.quantitySold;
+//                System.out.println("numerator " + market.numerator);
+//                System.out.println("denominator " + market.denominator);
+//            });
+//        });
+//    }
 
     public static Action<Economy> CalculateAndSendAveragePrice() {
         return Action.create(Economy.class, market -> {
@@ -112,17 +143,26 @@ public class Economy extends Agent<Globals> {
             // new average price
             market.averagePrice = market.numerator / market.denominator;
             System.out.println("previous average price " + market.previousAveragePrice + " current average price " + market.averagePrice);
-            market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class,  (m, l) -> {
-                m.averagePrice = market.averagePrice;
+
+            market.numerator = 0;
+            market.denominator = 0;
+            market.priceOfGoodsDemanded.forEach((price, output) -> {
+                market.numerator += (price * output);
+                market.denominator += output;
+            });
+            // average price of demanded goods
+            market.getLinks(Links.EconomyToFirm.class).send(Messages.AveragePrice.class, (m, l) -> {
+                m.averagePrice = market.numerator/ market.denominator;
             });
         });
     }
+
 
     public static Action<Economy> CalculateInflation() {
         return Action.create(Economy.class, market -> {
             market.inflation = (market.averagePrice - market.previousAveragePrice) / market.previousAveragePrice;
             //System.out.println(market.inflation+2);
-            market.inflation = (market.inflation / market.getGlobals().gamma_p) + 2;
+//            market.inflation = (market.inflation / market.getGlobals().gamma_p) + 2;
         });
 
     }
@@ -215,13 +255,13 @@ public class Economy extends Agent<Globals> {
 
             // store the sector and the total available workers per sector
             HashMap<Integer, Integer> availableWorkersPerSector = new HashMap<Integer, Integer>();
-            for(int sector = 0; sector < market.getGlobals().nbSectors; sector++){
+            for (int sector = 0; sector < market.getGlobals().nbSectors; sector++) {
                 int workers = Collections.frequency(availableWorkers.values(), sector);
                 availableWorkersPerSector.put(sector, workers);
             }
 
             // for each message from the firm, the economy sends a message back to the firm with the available workers in its sector
-            if (market.hasMessageOfType(Messages.FirmGetAvailableWorkers.class)){
+            if (market.hasMessageOfType(Messages.FirmGetAvailableWorkers.class)) {
                 market.getMessagesOfType(Messages.FirmGetAvailableWorkers.class).forEach(message -> {
                     market.send(Messages.AvailableWorkersInYourSector.class, totalAvailableWorkers -> {
                         totalAvailableWorkers.workers = availableWorkersPerSector.get(message.sector);
@@ -267,20 +307,18 @@ public class Economy extends Agent<Globals> {
                         // the healthy firm pays off the debt of the indebted firm
                         economy.healthyFirmAccountMap.get(healthyFirmID).updateDeposits(debt);
                         economy.send(Messages.PaidDebtOfIndebtedFirm.class, paymentOdDebtMessage -> {
-                           paymentOdDebtMessage.debt = debt;
+                            paymentOdDebtMessage.debt = debt;
                         }).to(healthyFirmID);
 
                         // the indebted firm no longer has any debt
                         // not too sure if I need to do this in this step
                         // economy.send(Messages.NoDebt.class).to(indebtedFirmID);
                         economy.bailedOutFirmsMap.put(indebtedFirmID, new BailoutPackage(economy.healthyFirmAccountMap.get(healthyFirmID).price, economy.healthyFirmAccountMap.get(healthyFirmID).wage));
-                    }
-                    else {
+                    } else {
                         economy.deficit -= debt;
                         economy.bankruptFirmsArray.add(indebtedFirmID);
                     }
-                }
-                else {
+                } else {
                     economy.deficit -= debt;
                     economy.bankruptFirmsArray.add(indebtedFirmID);
                 }
